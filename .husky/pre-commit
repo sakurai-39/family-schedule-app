@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+
+# Block commits that include .env files (CLAUDE.md item 7)
+if git diff --cached --name-only | grep -E '^\.env(\.|$)' | grep -v '\.env\.example$'; then
+  echo "ERROR: Attempting to commit .env file. This is forbidden by CLAUDE.md (item 7)."
+  echo "Files detected:"
+  git diff --cached --name-only | grep -E '^\.env(\.|$)' | grep -v '\.env\.example$'
+  exit 1
+fi
+
+# Run lint and typecheck
+npm run lint
+npm run typecheck
