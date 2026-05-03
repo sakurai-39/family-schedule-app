@@ -60,3 +60,9 @@ desktop.ini
 
 # Coverage
 coverage/
+
+# Firebase
+firestore-debug.log
+firebase-debug.log
+.firebase/
+ui-debug.log
