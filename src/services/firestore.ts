@@ -6,8 +6,13 @@ import {
   updateDoc,
   serverTimestamp,
   Timestamp,
+  collection,
+  addDoc,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { User } from '../types/User';
+import { Household, HOUSEHOLD_MAX_MEMBERS } from '../types/Household';
 import { validateDisplayName, sanitizeText } from '../utils/validation';
 
 export type CreateUserInput = {
@@ -78,4 +83,80 @@ export async function updateUser(
   }
 
   await updateDoc(doc(db, 'users', userId), payload);
+}
+
+export async function createHousehold(db: Firestore, creatorUserId: string): Promise<string> {
+  const ref = await addDoc(collection(db, 'households'), {
+    members: [creatorUserId],
+    createdAt: serverTimestamp(),
+    inviteCode: null,
+    inviteCodeExpiresAt: null,
+  });
+  return ref.id;
+}
+
+export async function getHousehold(db: Firestore, householdId: string): Promise<Household | null> {
+  const snap = await getDoc(doc(db, 'households', householdId));
+  if (!snap.exists()) {
+    return null;
+  }
+  const data = snap.data();
+
+  const createdAtRaw = data.createdAt;
+  const createdAt =
+    createdAtRaw instanceof Timestamp
+      ? createdAtRaw.toDate()
+      : createdAtRaw instanceof Date
+        ? createdAtRaw
+        : new Date(0);
+
+  const expiresAtRaw = data.inviteCodeExpiresAt;
+  const inviteCodeExpiresAt =
+    expiresAtRaw instanceof Timestamp
+      ? expiresAtRaw.toDate()
+      : expiresAtRaw instanceof Date
+        ? expiresAtRaw
+        : null;
+
+  return {
+    householdId,
+    members: Array.isArray(data.members) ? (data.members as string[]) : [],
+    createdAt,
+    inviteCode: data.inviteCode ?? null,
+    inviteCodeExpiresAt,
+  };
+}
+
+export async function addMember(
+  db: Firestore,
+  householdId: string,
+  newUserId: string
+): Promise<void> {
+  const household = await getHousehold(db, householdId);
+  if (!household) {
+    throw new Error(`household ${householdId} not found`);
+  }
+  if (household.members.includes(newUserId)) {
+    return;
+  }
+  if (household.members.length >= HOUSEHOLD_MAX_MEMBERS) {
+    throw new Error(`household already has ${HOUSEHOLD_MAX_MEMBERS} members (max)`);
+  }
+  await updateDoc(doc(db, 'households', householdId), {
+    members: arrayUnion(newUserId),
+  });
+}
+
+export async function removeMember(
+  db: Firestore,
+  householdId: string,
+  targetUserId: string,
+  callerUserId: string
+): Promise<void> {
+  if (targetUserId === callerUserId) {
+    throw new Error('cannot remove yourself from a household');
+  }
+  await updateDoc(doc(db, 'households', householdId), {
+    members: arrayRemove(targetUserId),
+  });
 }
