@@ -13,7 +13,13 @@ import {
 } from 'firebase/firestore';
 import { User } from '../types/User';
 import { Household, HOUSEHOLD_MAX_MEMBERS } from '../types/Household';
-import { validateDisplayName, sanitizeText } from '../utils/validation';
+import { CalendarItem, InboxItemDraft, ScheduledItemDraft } from '../types/CalendarItem';
+import {
+  validateDisplayName,
+  validateTitle,
+  sanitizeText,
+  isValidScheduledItem,
+} from '../utils/validation';
 
 export type CreateUserInput = {
   userId: string;
@@ -159,4 +165,117 @@ export async function removeMember(
   await updateDoc(doc(db, 'households', householdId), {
     members: arrayRemove(targetUserId),
   });
+}
+
+export async function createInboxItem(
+  db: Firestore,
+  householdId: string,
+  draft: InboxItemDraft
+): Promise<string> {
+  const sanitizedTitle = sanitizeText(draft.title);
+  const result = validateTitle(sanitizedTitle);
+  if (!result.ok) {
+    throw new Error(result.reason);
+  }
+
+  const ref = await addDoc(collection(db, `households/${householdId}/calendar_items`), {
+    status: 'inbox',
+    type: null,
+    title: sanitizedTitle,
+    assignee: null,
+    startAt: null,
+    dueAt: null,
+    memo: '',
+    isCompleted: false,
+    recurrence: null,
+    createdBy: draft.createdBy,
+    inputDurationMs: draft.inputDurationMs,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function getCalendarItem(
+  db: Firestore,
+  householdId: string,
+  itemId: string
+): Promise<CalendarItem | null> {
+  const snap = await getDoc(doc(db, `households/${householdId}/calendar_items`, itemId));
+  if (!snap.exists()) {
+    return null;
+  }
+  const data = snap.data();
+
+  const toDate = (raw: unknown): Date | null => {
+    if (raw instanceof Timestamp) return raw.toDate();
+    if (raw instanceof Date) return raw;
+    return null;
+  };
+
+  const createdAtRaw = data.createdAt;
+  const createdAt =
+    createdAtRaw instanceof Timestamp
+      ? createdAtRaw.toDate()
+      : createdAtRaw instanceof Date
+        ? createdAtRaw
+        : new Date(0);
+
+  const updatedAtRaw = data.updatedAt;
+  const updatedAt =
+    updatedAtRaw instanceof Timestamp
+      ? updatedAtRaw.toDate()
+      : updatedAtRaw instanceof Date
+        ? updatedAtRaw
+        : new Date(0);
+
+  return {
+    itemId,
+    status: data.status,
+    type: data.type ?? null,
+    title: data.title,
+    assignee: data.assignee ?? null,
+    startAt: toDate(data.startAt),
+    dueAt: toDate(data.dueAt),
+    memo: data.memo ?? '',
+    isCompleted: data.isCompleted ?? false,
+    recurrence: null,
+    createdBy: data.createdBy,
+    inputDurationMs: data.inputDurationMs ?? null,
+    createdAt,
+    updatedAt,
+  };
+}
+
+export async function promoteInboxToScheduled(
+  db: Firestore,
+  householdId: string,
+  itemId: string,
+  draft: ScheduledItemDraft
+): Promise<void> {
+  if (!isValidScheduledItem(draft)) {
+    throw new Error('Invalid scheduled item draft (missing required fields)');
+  }
+
+  const sanitizedTitle = sanitizeText(draft.title);
+  const sanitizedMemo = draft.memo !== undefined ? sanitizeText(draft.memo) : '';
+
+  const updates: Record<string, unknown> = {
+    status: 'scheduled',
+    type: draft.type,
+    title: sanitizedTitle,
+    assignee: draft.assignee,
+    memo: sanitizedMemo,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (draft.type === 'event') {
+    updates.startAt = draft.startAt;
+    updates.dueAt = null;
+  } else {
+    updates.startAt = null;
+    updates.dueAt = draft.dueAt;
+  }
+
+  await updateDoc(doc(db, `households/${householdId}/calendar_items`, itemId), updates);
 }
