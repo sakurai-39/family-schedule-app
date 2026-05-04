@@ -273,3 +273,44 @@ describe('inbox/calendar_items service', () => {
     expect(scheduledItems[0]?.itemId).toBe(id2);
   });
 });
+
+describe('member deletion data integrity', () => {
+  it('removed member can no longer write but assignee tags are preserved', async () => {
+    const aliceCtx = testEnv.authenticatedContext('user-A');
+    const aliceDb = aliceCtx.firestore() as any;
+    const householdId = await createHousehold(aliceDb, 'user-A');
+    await addMember(aliceDb, householdId, 'user-B');
+
+    // B が event を作る（member なので可）
+    const bobDb = testEnv.authenticatedContext('user-B').firestore() as any;
+    const itemId = await createInboxItem(bobDb, householdId, {
+      title: '保育園参観',
+      createdBy: 'user-B',
+      inputDurationMs: null,
+    });
+    await promoteInboxToScheduled(bobDb, householdId, itemId, {
+      type: 'event',
+      title: '保育園参観',
+      assignee: 'user-B',
+      startAt: new Date('2026-07-01T09:00:00Z'),
+    });
+
+    // A が B を removeMember
+    await removeMember(aliceDb, householdId, 'user-B', 'user-A');
+
+    // B はもう書き込めない（Rules で弾かれる）
+    await expect(
+      createInboxItem(bobDb, householdId, {
+        title: '不正書き込み',
+        createdBy: 'user-B',
+        inputDurationMs: null,
+      })
+    ).rejects.toThrow();
+
+    // しかし作成済みのデータは残っている（A から見える）
+    const items = await listCalendarItems(aliceDb, householdId, { status: 'scheduled' });
+    expect(items.length).toBe(1);
+    expect(items[0]?.assignee).toBe('user-B'); // タグはそのまま残る
+    expect(items[0]?.createdBy).toBe('user-B');
+  });
+});
