@@ -12,6 +12,9 @@ import {
   createInboxItem,
   getCalendarItem,
   promoteInboxToScheduled,
+  updateCalendarItem,
+  deleteCalendarItem,
+  listCalendarItems,
 } from '../services/firestore';
 
 let testEnv: RulesTestEnvironment;
@@ -218,5 +221,55 @@ describe('inbox/calendar_items service', () => {
     expect(item?.status).toBe('scheduled');
     expect(item?.type).toBe('task');
     expect(item?.dueAt).toBeNull();
+  });
+
+  it('updateCalendarItem updates memo and updatedAt', async () => {
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore() as any;
+    const itemId = await createInboxItem(aliceDb, householdId, {
+      title: 'メモ',
+      createdBy: 'user-A',
+      inputDurationMs: null,
+    });
+    await updateCalendarItem(aliceDb, householdId, itemId, { memo: '追記内容' });
+    const item = await getCalendarItem(aliceDb, householdId, itemId);
+    expect(item?.memo).toBe('追記内容');
+  });
+
+  it('deleteCalendarItem removes the doc', async () => {
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore() as any;
+    const itemId = await createInboxItem(aliceDb, householdId, {
+      title: '削除対象',
+      createdBy: 'user-A',
+      inputDurationMs: null,
+    });
+    await deleteCalendarItem(aliceDb, householdId, itemId);
+    const item = await getCalendarItem(aliceDb, householdId, itemId);
+    expect(item).toBeNull();
+  });
+
+  it('listCalendarItems with status filter returns only inbox items', async () => {
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore() as any;
+    const id1 = await createInboxItem(aliceDb, householdId, {
+      title: 'まだinbox',
+      createdBy: 'user-A',
+      inputDurationMs: null,
+    });
+    const id2 = await createInboxItem(aliceDb, householdId, {
+      title: '昇格済み',
+      createdBy: 'user-A',
+      inputDurationMs: null,
+    });
+    await promoteInboxToScheduled(aliceDb, householdId, id2, {
+      type: 'task',
+      title: '昇格済み',
+      assignee: 'user-A',
+      dueAt: null,
+    });
+    const inboxItems = await listCalendarItems(aliceDb, householdId, { status: 'inbox' });
+    expect(inboxItems.length).toBe(1);
+    expect(inboxItems[0]?.itemId).toBe(id1);
+    const scheduledItems = await listCalendarItems(aliceDb, householdId, { status: 'scheduled' });
+    expect(scheduledItems.length).toBe(1);
+    expect(scheduledItems[0]?.itemId).toBe(id2);
   });
 });

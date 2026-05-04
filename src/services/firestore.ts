@@ -4,16 +4,26 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   collection,
   addDoc,
   arrayUnion,
   arrayRemove,
+  query,
+  where,
+  getDocs,
+  orderBy,
 } from 'firebase/firestore';
 import { User } from '../types/User';
 import { Household, HOUSEHOLD_MAX_MEMBERS } from '../types/Household';
-import { CalendarItem, InboxItemDraft, ScheduledItemDraft } from '../types/CalendarItem';
+import {
+  CalendarItem,
+  InboxItemDraft,
+  ScheduledItemDraft,
+  ItemStatus,
+} from '../types/CalendarItem';
 import {
   validateDisplayName,
   validateTitle,
@@ -278,4 +288,118 @@ export async function promoteInboxToScheduled(
   }
 
   await updateDoc(doc(db, `households/${householdId}/calendar_items`, itemId), updates);
+}
+
+export async function updateCalendarItem(
+  db: Firestore,
+  householdId: string,
+  itemId: string,
+  updates: Partial<
+    Pick<CalendarItem, 'title' | 'memo' | 'isCompleted' | 'assignee' | 'startAt' | 'dueAt'>
+  >
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+
+  if (updates.title !== undefined) {
+    const sanitized = sanitizeText(updates.title);
+    const result = validateTitle(sanitized);
+    if (!result.ok) {
+      throw new Error(result.reason);
+    }
+    payload.title = sanitized;
+  }
+
+  if (updates.memo !== undefined) {
+    payload.memo = sanitizeText(updates.memo);
+  }
+
+  if (updates.isCompleted !== undefined) {
+    payload.isCompleted = updates.isCompleted;
+  }
+
+  if (updates.assignee !== undefined) {
+    payload.assignee = updates.assignee;
+  }
+
+  if (updates.startAt !== undefined) {
+    payload.startAt = updates.startAt;
+  }
+
+  if (updates.dueAt !== undefined) {
+    payload.dueAt = updates.dueAt;
+  }
+
+  payload.updatedAt = serverTimestamp();
+
+  await updateDoc(doc(db, `households/${householdId}/calendar_items`, itemId), payload);
+}
+
+export async function deleteCalendarItem(
+  db: Firestore,
+  householdId: string,
+  itemId: string
+): Promise<void> {
+  await deleteDoc(doc(db, `households/${householdId}/calendar_items`, itemId));
+}
+
+export type ListItemsOptions = {
+  status?: ItemStatus;
+};
+
+export async function listCalendarItems(
+  db: Firestore,
+  householdId: string,
+  options: ListItemsOptions = {}
+): Promise<CalendarItem[]> {
+  const colRef = collection(db, `households/${householdId}/calendar_items`);
+  const constraints = [];
+  if (options.status !== undefined) {
+    constraints.push(where('status', '==', options.status));
+  }
+  constraints.push(orderBy('createdAt', 'desc'));
+
+  const q = query(colRef, ...constraints);
+  const snap = await getDocs(q);
+
+  const toDate = (raw: unknown): Date | null => {
+    if (raw instanceof Timestamp) return raw.toDate();
+    if (raw instanceof Date) return raw;
+    return null;
+  };
+
+  return snap.docs.map((d) => {
+    const data = d.data();
+    const createdAtRaw = data.createdAt;
+    const createdAt =
+      createdAtRaw instanceof Timestamp
+        ? createdAtRaw.toDate()
+        : createdAtRaw instanceof Date
+          ? createdAtRaw
+          : new Date(0);
+
+    const updatedAtRaw = data.updatedAt;
+    const updatedAt =
+      updatedAtRaw instanceof Timestamp
+        ? updatedAtRaw.toDate()
+        : updatedAtRaw instanceof Date
+          ? updatedAtRaw
+          : new Date(0);
+
+    return {
+      itemId: d.id,
+      status: data.status,
+      type: data.type ?? null,
+      title: data.title,
+      assignee: data.assignee ?? null,
+      startAt: toDate(data.startAt),
+      dueAt: toDate(data.dueAt),
+      memo: data.memo ?? '',
+      isCompleted: data.isCompleted ?? false,
+      recurrence: null,
+      createdBy: data.createdBy,
+      inputDurationMs: data.inputDurationMs ?? null,
+      createdAt,
+      updatedAt,
+    };
+  });
 }
