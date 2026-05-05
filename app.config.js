@@ -13,6 +13,7 @@ export default ({ config }) => ({
     backgroundColor: '#ffffff',
   },
   assetBundlePatterns: ['**/*'],
+  plugins: ['@react-native-google-signin/google-signin'],
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.ryou.familyscheduleapp',
@@ -25,6 +26,7 @@ export default ({ config }) => ({
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: 'com.ryou.familyscheduleapp',
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
   },
   web: {
     favicon: './assets/favicon.png',
