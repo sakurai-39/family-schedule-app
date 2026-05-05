@@ -122,6 +122,7 @@ describe('generateInviteCode', () => {
 describe('joinHouseholdByCode', () => {
   it('adds the user to the matching active household and clears the invite code', async () => {
     const db = { name: 'firestore-test-db' } as never;
+    const now = new Date('2026-05-05T00:00:00.000Z');
     mockedGetDocs.mockResolvedValueOnce({
       empty: false,
       docs: [
@@ -137,12 +138,13 @@ describe('joinHouseholdByCode', () => {
     } as never);
 
     const householdId = await joinHouseholdByCode(db, 'user-B', '482917', {
-      now: () => new Date('2026-05-05T00:00:00.000Z'),
+      now: () => now,
     });
 
     expect(householdId).toBe('household-1');
     expect(mockedCollection).toHaveBeenCalledWith(db, 'households');
     expect(mockedWhere).toHaveBeenCalledWith('inviteCode', '==', '482917');
+    expect(mockedWhere).toHaveBeenCalledWith('inviteCodeExpiresAt', '>', now);
     expect(mockedQuery).toHaveBeenCalled();
     expect(mockedWriteBatch).toHaveBeenCalledWith(db);
     expect(mockedArrayUnion).toHaveBeenCalledWith('user-B');

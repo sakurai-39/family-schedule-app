@@ -100,7 +100,12 @@ export async function joinHouseholdByCode(
   }
 
   const now = options.now ?? (() => new Date());
-  const householdsQuery = query(collection(db, 'households'), where('inviteCode', '==', code));
+  const currentTime = now();
+  const householdsQuery = query(
+    collection(db, 'households'),
+    where('inviteCode', '==', code),
+    where('inviteCodeExpiresAt', '>', currentTime)
+  );
   const snap = await getDocs(householdsQuery);
 
   if (snap.empty || snap.docs.length === 0) {
@@ -115,7 +120,7 @@ export async function joinHouseholdByCode(
   const data = householdDoc.data();
   const inviteCodeExpiresAt = toDate(data.inviteCodeExpiresAt);
 
-  if (!inviteCodeExpiresAt || inviteCodeExpiresAt.getTime() <= now().getTime()) {
+  if (!inviteCodeExpiresAt || inviteCodeExpiresAt.getTime() <= currentTime.getTime()) {
     throw new Error('招待コードの有効期限が切れています');
   }
 
