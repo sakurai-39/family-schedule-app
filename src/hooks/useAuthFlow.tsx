@@ -1,4 +1,12 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Auth, User as FirebaseUser } from 'firebase/auth';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
@@ -14,11 +22,22 @@ export async function loadSignedInUser(db: Firestore, firebaseUser: FirebaseUser
   return user;
 }
 
+export async function refreshSignedInUser(
+  db: Firestore,
+  firebaseUser: FirebaseUser | null
+): Promise<User | null> {
+  if (!firebaseUser) {
+    return null;
+  }
+  return loadSignedInUser(db, firebaseUser);
+}
+
 export type AuthFlowContextValue = {
   firebaseUser: FirebaseUser | null;
   user: User | null;
   isLoading: boolean;
   error: Error | null;
+  refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -35,6 +54,24 @@ export function AuthProvider({ auth, db, children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  const refreshUser = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const nextUser = await refreshSignedInUser(db, firebaseUser);
+      setUser(nextUser);
+    } catch (unknownError) {
+      const nextError =
+        unknownError instanceof Error ? unknownError : new Error('Auth flow failed');
+      setUser(null);
+      setError(nextError);
+      throw nextError;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [db, firebaseUser]);
 
   useEffect(() => {
     let isActive = true;
@@ -80,9 +117,10 @@ export function AuthProvider({ auth, db, children }: AuthProviderProps) {
       user,
       isLoading,
       error,
+      refreshUser,
       signOut: () => signOutUser(auth),
     }),
-    [auth, error, firebaseUser, isLoading, user]
+    [auth, error, firebaseUser, isLoading, refreshUser, user]
   );
 
   return <AuthFlowContext.Provider value={value}>{children}</AuthFlowContext.Provider>;
