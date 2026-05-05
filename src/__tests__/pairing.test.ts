@@ -1,13 +1,4 @@
-import {
-  arrayUnion,
-  collection,
-  doc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
-  writeBatch,
-} from 'firebase/firestore';
+import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import {
   generateInviteCode,
   generateInviteCodeValue,
@@ -18,7 +9,6 @@ const mockBatchUpdate = jest.fn();
 const mockBatchCommit = jest.fn(() => Promise.resolve());
 
 jest.mock('firebase/firestore', () => ({
-  arrayUnion: jest.fn((...values: string[]) => ({ type: 'arrayUnion', values })),
   collection: jest.fn((db: unknown, ...pathSegments: string[]) => ({ db, pathSegments })),
   doc: jest.fn((db: unknown, ...pathSegments: string[]) => ({ db, pathSegments })),
   getDocs: jest.fn(),
@@ -38,7 +28,6 @@ jest.mock('firebase/firestore', () => ({
   })),
 }));
 
-const mockedArrayUnion = jest.mocked(arrayUnion);
 const mockedCollection = jest.mocked(collection);
 const mockedDoc = jest.mocked(doc);
 const mockedGetDocs = jest.mocked(getDocs);
@@ -147,11 +136,10 @@ describe('joinHouseholdByCode', () => {
     expect(mockedWhere).toHaveBeenCalledWith('inviteCodeExpiresAt', '>', now);
     expect(mockedQuery).toHaveBeenCalled();
     expect(mockedWriteBatch).toHaveBeenCalledWith(db);
-    expect(mockedArrayUnion).toHaveBeenCalledWith('user-B');
     expect(mockBatchUpdate).toHaveBeenCalledWith(
       { db, pathSegments: ['households', 'household-1'] },
       {
-        members: { type: 'arrayUnion', values: ['user-B'] },
+        members: ['user-A', 'user-B'],
         inviteCode: null,
         inviteCodeExpiresAt: null,
       }

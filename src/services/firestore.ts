@@ -10,7 +10,6 @@ import {
   collection,
   addDoc,
   arrayUnion,
-  arrayRemove,
   query,
   where,
   getDocs,
@@ -172,8 +171,12 @@ export async function removeMember(
   if (targetUserId === callerUserId) {
     throw new Error('cannot remove yourself from a household');
   }
+  const household = await getHousehold(db, householdId);
+  if (!household) {
+    throw new Error(`household ${householdId} not found`);
+  }
   await updateDoc(doc(db, 'households', householdId), {
-    members: arrayRemove(targetUserId),
+    members: household.members.filter((memberId) => memberId !== targetUserId),
   });
 }
 

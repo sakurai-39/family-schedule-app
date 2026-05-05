@@ -1,6 +1,5 @@
 import { getRandomValues } from 'expo-crypto';
 import {
-  arrayUnion,
   collection,
   doc,
   Firestore,
@@ -134,7 +133,7 @@ export async function joinHouseholdByCode(
 
   const batch = writeBatch(db);
   batch.update(doc(db, 'households', householdDoc.id), {
-    members: arrayUnion(userId),
+    members: [...members, userId],
     inviteCode: null,
     inviteCodeExpiresAt: null,
   });
