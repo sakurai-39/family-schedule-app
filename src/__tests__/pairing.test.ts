@@ -1,16 +1,55 @@
-import { doc, updateDoc } from 'firebase/firestore';
-import { generateInviteCode, generateInviteCodeValue } from '../services/pairing';
+import {
+  arrayUnion,
+  collection,
+  doc,
+  getDocs,
+  query,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+import {
+  generateInviteCode,
+  generateInviteCodeValue,
+  joinHouseholdByCode,
+} from '../services/pairing';
+
+const mockBatchUpdate = jest.fn();
+const mockBatchCommit = jest.fn(() => Promise.resolve());
 
 jest.mock('firebase/firestore', () => ({
+  arrayUnion: jest.fn((...values: string[]) => ({ type: 'arrayUnion', values })),
+  collection: jest.fn((db: unknown, ...pathSegments: string[]) => ({ db, pathSegments })),
   doc: jest.fn((db: unknown, ...pathSegments: string[]) => ({ db, pathSegments })),
+  getDocs: jest.fn(),
+  query: jest.fn((collectionRef: unknown, ...constraints: unknown[]) => ({
+    collectionRef,
+    constraints,
+  })),
   updateDoc: jest.fn(() => Promise.resolve()),
+  where: jest.fn((fieldPath: string, opStr: string, value: unknown) => ({
+    fieldPath,
+    opStr,
+    value,
+  })),
+  writeBatch: jest.fn(() => ({
+    update: mockBatchUpdate,
+    commit: mockBatchCommit,
+  })),
 }));
 
+const mockedArrayUnion = jest.mocked(arrayUnion);
+const mockedCollection = jest.mocked(collection);
 const mockedDoc = jest.mocked(doc);
+const mockedGetDocs = jest.mocked(getDocs);
+const mockedQuery = jest.mocked(query);
 const mockedUpdateDoc = jest.mocked(updateDoc);
+const mockedWhere = jest.mocked(where);
+const mockedWriteBatch = jest.mocked(writeBatch);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockBatchCommit.mockResolvedValue(undefined);
 });
 
 describe('generateInviteCodeValue', () => {
@@ -77,5 +116,100 @@ describe('generateInviteCode', () => {
     ).rejects.toThrow('数字のみで入力してください');
 
     expect(mockedUpdateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('joinHouseholdByCode', () => {
+  it('adds the user to the matching active household and clears the invite code', async () => {
+    const db = { name: 'firestore-test-db' } as never;
+    mockedGetDocs.mockResolvedValueOnce({
+      empty: false,
+      docs: [
+        {
+          id: 'household-1',
+          data: () => ({
+            inviteCode: '482917',
+            inviteCodeExpiresAt: new Date('2026-05-06T00:00:00.000Z'),
+            members: ['user-A'],
+          }),
+        },
+      ],
+    } as never);
+
+    const householdId = await joinHouseholdByCode(db, 'user-B', '482917', {
+      now: () => new Date('2026-05-05T00:00:00.000Z'),
+    });
+
+    expect(householdId).toBe('household-1');
+    expect(mockedCollection).toHaveBeenCalledWith(db, 'households');
+    expect(mockedWhere).toHaveBeenCalledWith('inviteCode', '==', '482917');
+    expect(mockedQuery).toHaveBeenCalled();
+    expect(mockedWriteBatch).toHaveBeenCalledWith(db);
+    expect(mockedArrayUnion).toHaveBeenCalledWith('user-B');
+    expect(mockBatchUpdate).toHaveBeenCalledWith(
+      { db, pathSegments: ['households', 'household-1'] },
+      {
+        members: { type: 'arrayUnion', values: ['user-B'] },
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      }
+    );
+    expect(mockBatchUpdate).toHaveBeenCalledWith(
+      { db, pathSegments: ['users', 'user-B'] },
+      { householdId: 'household-1' }
+    );
+    expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects expired invite codes before writing', async () => {
+    const db = { name: 'firestore-test-db' } as never;
+    mockedGetDocs.mockResolvedValueOnce({
+      empty: false,
+      docs: [
+        {
+          id: 'household-1',
+          data: () => ({
+            inviteCode: '482917',
+            inviteCodeExpiresAt: new Date('2026-05-04T23:59:59.999Z'),
+            members: ['user-A'],
+          }),
+        },
+      ],
+    } as never);
+
+    await expect(
+      joinHouseholdByCode(db, 'user-B', '482917', {
+        now: () => new Date('2026-05-05T00:00:00.000Z'),
+      })
+    ).rejects.toThrow('招待コードの有効期限が切れています');
+
+    expect(mockBatchUpdate).not.toHaveBeenCalled();
+    expect(mockBatchCommit).not.toHaveBeenCalled();
+  });
+
+  it('rejects households that already have 2 members', async () => {
+    const db = { name: 'firestore-test-db' } as never;
+    mockedGetDocs.mockResolvedValueOnce({
+      empty: false,
+      docs: [
+        {
+          id: 'household-1',
+          data: () => ({
+            inviteCode: '482917',
+            inviteCodeExpiresAt: new Date('2026-05-06T00:00:00.000Z'),
+            members: ['user-A', 'user-C'],
+          }),
+        },
+      ],
+    } as never);
+
+    await expect(
+      joinHouseholdByCode(db, 'user-B', '482917', {
+        now: () => new Date('2026-05-05T00:00:00.000Z'),
+      })
+    ).rejects.toThrow('家族メンバーは2人までです');
+
+    expect(mockBatchUpdate).not.toHaveBeenCalled();
+    expect(mockBatchCommit).not.toHaveBeenCalled();
   });
 });

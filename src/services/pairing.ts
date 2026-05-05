@@ -1,6 +1,20 @@
 import { getRandomValues } from 'expo-crypto';
-import { doc, Firestore, updateDoc } from 'firebase/firestore';
-import { INVITE_CODE_EXPIRY_HOURS, INVITE_CODE_LENGTH } from '../types/Household';
+import {
+  arrayUnion,
+  collection,
+  doc,
+  Firestore,
+  getDocs,
+  query,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+import {
+  HOUSEHOLD_MAX_MEMBERS,
+  INVITE_CODE_EXPIRY_HOURS,
+  INVITE_CODE_LENGTH,
+} from '../types/Household';
 import { validateInviteCode } from '../utils/validation';
 
 const INVITE_CODE_RANGE = 10 ** INVITE_CODE_LENGTH;
@@ -55,4 +69,72 @@ export async function generateInviteCode(
   });
 
   return code;
+}
+
+export type JoinHouseholdByCodeOptions = {
+  now?: () => Date;
+};
+
+function toDate(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    'toDate' in value &&
+    typeof value.toDate === 'function'
+  ) {
+    return value.toDate();
+  }
+  return null;
+}
+
+export async function joinHouseholdByCode(
+  db: Firestore,
+  userId: string,
+  code: string,
+  options: JoinHouseholdByCodeOptions = {}
+): Promise<string> {
+  const validation = validateInviteCode(code);
+  if (!validation.ok) {
+    throw new Error(validation.reason);
+  }
+
+  const now = options.now ?? (() => new Date());
+  const householdsQuery = query(collection(db, 'households'), where('inviteCode', '==', code));
+  const snap = await getDocs(householdsQuery);
+
+  if (snap.empty || snap.docs.length === 0) {
+    throw new Error('招待コードが見つかりません');
+  }
+
+  const householdDoc = snap.docs[0];
+  if (!householdDoc) {
+    throw new Error('招待コードが見つかりません');
+  }
+
+  const data = householdDoc.data();
+  const inviteCodeExpiresAt = toDate(data.inviteCodeExpiresAt);
+
+  if (!inviteCodeExpiresAt || inviteCodeExpiresAt.getTime() <= now().getTime()) {
+    throw new Error('招待コードの有効期限が切れています');
+  }
+
+  const members = Array.isArray(data.members) ? (data.members as string[]) : [];
+  if (members.includes(userId)) {
+    return householdDoc.id;
+  }
+  if (members.length >= HOUSEHOLD_MAX_MEMBERS) {
+    throw new Error('家族メンバーは2人までです');
+  }
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'households', householdDoc.id), {
+    members: arrayUnion(userId),
+    inviteCode: null,
+    inviteCodeExpiresAt: null,
+  });
+  batch.update(doc(db, 'users', userId), { householdId: householdDoc.id });
+  await batch.commit();
+
+  return householdDoc.id;
 }
