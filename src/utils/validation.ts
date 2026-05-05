@@ -37,6 +37,10 @@ export function validateInviteCode(value: string): ValidationResult {
   return { ok: true };
 }
 
+export function normalizeInviteCodeInput(value: string): string {
+  return value.replace(/\D/g, '').slice(0, INVITE_CODE_LENGTH);
+}
+
 // Strip dangerous control chars (U+0000-U+001F) but preserve \t (0x09), \n (0x0A), \r (0x0D)
 const CONTROL_CHAR_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
 

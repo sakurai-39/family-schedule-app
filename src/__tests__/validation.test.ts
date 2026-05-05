@@ -3,6 +3,7 @@ import {
   validateTitle,
   validateMemo,
   validateInviteCode,
+  normalizeInviteCodeInput,
   sanitizeText,
   isValidScheduledItem,
 } from '../utils/validation';
@@ -59,6 +60,14 @@ describe('validateInviteCode', () => {
   it('rejects wrong length', () => {
     expect(validateInviteCode('12345').ok).toBe(false);
     expect(validateInviteCode('1234567').ok).toBe(false);
+  });
+});
+
+describe('normalizeInviteCodeInput', () => {
+  it('keeps only numeric characters and limits the value to 6 digits', () => {
+    expect(normalizeInviteCodeInput(' 482-917 ')).toBe('482917');
+    expect(normalizeInviteCodeInput('abc1234567')).toBe('123456');
+    expect(normalizeInviteCodeInput('１２３456')).toBe('456');
   });
 });
 

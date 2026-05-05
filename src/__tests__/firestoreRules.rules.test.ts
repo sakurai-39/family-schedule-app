@@ -4,7 +4,16 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { setDoc, doc, getDoc } from 'firebase/firestore';
+import {
+  setDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -108,6 +117,142 @@ describe('households collection', () => {
         createdAt: new Date(),
         inviteCode: null,
         inviteCodeExpiresAt: null,
+      })
+    );
+  });
+  it('rejects adding a member without an active invite code', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A'],
+        createdAt: new Date(),
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      });
+    });
+
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore();
+    await assertFails(updateDoc(doc(aliceDb, 'households/h-1'), { members: ['user-A', 'user-B'] }));
+  });
+
+  it('allows joining a household with an active invite code', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A'],
+        createdAt: new Date(),
+        inviteCode: '482917',
+        inviteCodeExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
+      });
+    });
+
+    const bobDb = testEnv.authenticatedContext('user-B').firestore();
+    await assertSucceeds(
+      updateDoc(doc(bobDb, 'households/h-1'), {
+        members: ['user-A', 'user-B'],
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      })
+    );
+  });
+
+  it('allows looking up a household by invite code', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A'],
+        createdAt: new Date(),
+        inviteCode: '482917',
+        inviteCodeExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
+      });
+    });
+
+    const bobDb = testEnv.authenticatedContext('user-B').firestore();
+    await assertSucceeds(
+      getDocs(query(collection(bobDb, 'households'), where('inviteCode', '==', '482917')))
+    );
+  });
+
+  it('rejects joining a household with an expired invite code', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A'],
+        createdAt: new Date(),
+        inviteCode: '482917',
+        inviteCodeExpiresAt: new Date('2000-01-01T00:00:00.000Z'),
+      });
+    });
+
+    const bobDb = testEnv.authenticatedContext('user-B').firestore();
+    await assertFails(
+      updateDoc(doc(bobDb, 'households/h-1'), {
+        members: ['user-A', 'user-B'],
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      })
+    );
+  });
+
+  it('rejects joining as the third household member', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A', 'user-B'],
+        createdAt: new Date(),
+        inviteCode: '482917',
+        inviteCodeExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
+      });
+    });
+
+    const charlieDb = testEnv.authenticatedContext('user-C').firestore();
+    await assertFails(
+      updateDoc(doc(charlieDb, 'households/h-1'), {
+        members: ['user-A', 'user-B', 'user-C'],
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      })
+    );
+  });
+
+  it('rejects removing yourself from household members', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A', 'user-B'],
+        createdAt: new Date(),
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      });
+    });
+
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore();
+    await assertFails(updateDoc(doc(aliceDb, 'households/h-1'), { members: ['user-B'] }));
+  });
+
+  it('allows removing another household member', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A', 'user-B'],
+        createdAt: new Date(),
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      });
+    });
+
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore();
+    await assertSucceeds(updateDoc(doc(aliceDb, 'households/h-1'), { members: ['user-A'] }));
+  });
+
+  it('allows a household member to reissue an invite code', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'households/h-1'), {
+        members: ['user-A'],
+        createdAt: new Date(),
+        inviteCode: null,
+        inviteCodeExpiresAt: null,
+      });
+    });
+
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore();
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'households/h-1'), {
+        inviteCode: '482917',
+        inviteCodeExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
       })
     );
   });

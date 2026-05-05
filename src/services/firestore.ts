@@ -10,7 +10,7 @@ import {
   collection,
   addDoc,
   arrayUnion,
-  arrayRemove,
+  writeBatch,
   query,
   where,
   getDocs,
@@ -40,9 +40,11 @@ export type CreateUserInput = {
 
 export async function createUser(db: Firestore, input: CreateUserInput): Promise<void> {
   const sanitizedDisplayName = sanitizeText(input.displayName);
-  const result = validateDisplayName(sanitizedDisplayName);
-  if (!result.ok) {
-    throw new Error(result.reason);
+  if (sanitizedDisplayName.length > 0) {
+    const result = validateDisplayName(sanitizedDisplayName);
+    if (!result.ok) {
+      throw new Error(result.reason);
+    }
   }
 
   await setDoc(doc(db, 'users', input.userId), {
@@ -111,6 +113,36 @@ export async function createHousehold(db: Firestore, creatorUserId: string): Pro
   return ref.id;
 }
 
+export async function createHouseholdForUser(
+  db: Firestore,
+  userId: string,
+  displayName: string
+): Promise<string> {
+  const sanitizedDisplayName = sanitizeText(displayName);
+  const result = validateDisplayName(sanitizedDisplayName);
+  if (!result.ok) {
+    throw new Error(result.reason);
+  }
+
+  const householdRef = doc(collection(db, 'households'));
+  const batch = writeBatch(db);
+
+  batch.set(householdRef, {
+    members: [userId],
+    createdAt: serverTimestamp(),
+    inviteCode: null,
+    inviteCodeExpiresAt: null,
+  });
+  batch.update(doc(db, 'users', userId), {
+    displayName: sanitizedDisplayName,
+    householdId: householdRef.id,
+  });
+
+  await batch.commit();
+
+  return householdRef.id;
+}
+
 export async function getHousehold(db: Firestore, householdId: string): Promise<Household | null> {
   const snap = await getDoc(doc(db, 'households', householdId));
   if (!snap.exists()) {
@@ -172,8 +204,12 @@ export async function removeMember(
   if (targetUserId === callerUserId) {
     throw new Error('cannot remove yourself from a household');
   }
+  const household = await getHousehold(db, householdId);
+  if (!household) {
+    throw new Error(`household ${householdId} not found`);
+  }
   await updateDoc(doc(db, 'households', householdId), {
-    members: arrayRemove(targetUserId),
+    members: household.members.filter((memberId) => memberId !== targetUserId),
   });
 }
 

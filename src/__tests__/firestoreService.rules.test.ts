@@ -1,4 +1,5 @@
 import { initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
+import { doc, setDoc } from 'firebase/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -97,25 +98,45 @@ describe('household service', () => {
     expect(household?.inviteCode).toBeNull();
   });
 
-  it('addMember adds a userId to members (capped at 2)', async () => {
+  it('addMember rejects direct member additions without an invite join', async () => {
     const aliceCtx = testEnv.authenticatedContext('user-A');
     const householdId = await createHousehold(aliceCtx.firestore() as any, 'user-A');
-    await addMember(aliceCtx.firestore() as any, householdId, 'user-B');
-    const household = await getHousehold(aliceCtx.firestore() as any, householdId);
-    expect(household?.members.sort()).toEqual(['user-A', 'user-B']);
+    await expect(addMember(aliceCtx.firestore() as any, householdId, 'user-B')).rejects.toThrow();
   });
 
   it('addMember rejects when household already at max (2)', async () => {
     const aliceCtx = testEnv.authenticatedContext('user-A');
     const householdId = await createHousehold(aliceCtx.firestore() as any, 'user-A');
-    await addMember(aliceCtx.firestore() as any, householdId, 'user-B');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'households', householdId),
+        {
+          members: ['user-A', 'user-B'],
+          createdAt: new Date(),
+          inviteCode: null,
+          inviteCodeExpiresAt: null,
+        },
+        { merge: true }
+      );
+    });
     await expect(addMember(aliceCtx.firestore() as any, householdId, 'user-C')).rejects.toThrow();
   });
 
   it('removeMember removes a userId from members (but cannot self-remove)', async () => {
     const aliceCtx = testEnv.authenticatedContext('user-A');
     const householdId = await createHousehold(aliceCtx.firestore() as any, 'user-A');
-    await addMember(aliceCtx.firestore() as any, householdId, 'user-B');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'households', householdId),
+        {
+          members: ['user-A', 'user-B'],
+          createdAt: new Date(),
+          inviteCode: null,
+          inviteCodeExpiresAt: null,
+        },
+        { merge: true }
+      );
+    });
     await removeMember(aliceCtx.firestore() as any, householdId, 'user-B', 'user-A');
     const household = await getHousehold(aliceCtx.firestore() as any, householdId);
     expect(household?.members).toEqual(['user-A']);
@@ -279,7 +300,18 @@ describe('member deletion data integrity', () => {
     const aliceCtx = testEnv.authenticatedContext('user-A');
     const aliceDb = aliceCtx.firestore() as any;
     const householdId = await createHousehold(aliceDb, 'user-A');
-    await addMember(aliceDb, householdId, 'user-B');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'households', householdId),
+        {
+          members: ['user-A', 'user-B'],
+          createdAt: new Date(),
+          inviteCode: null,
+          inviteCodeExpiresAt: null,
+        },
+        { merge: true }
+      );
+    });
 
     // B が event を作る（member なので可）
     const bobDb = testEnv.authenticatedContext('user-B').firestore() as any;
