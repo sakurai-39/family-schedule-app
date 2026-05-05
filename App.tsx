@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { auth, db } from './src/services/firebase';
 import { AuthProvider, useAuth } from './src/hooks/useAuthFlow';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { HouseholdSetupScreen } from './src/screens/HouseholdSetupScreen';
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
@@ -15,7 +16,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const { firebaseUser, user, isLoading, error, signOut } = useAuth();
+  const { firebaseUser, user, isLoading, error, refreshUser, signOut } = useAuth();
   const authReady = auth !== undefined;
   const dbReady = db !== undefined;
 
@@ -32,6 +33,15 @@ function AppContent() {
     return (
       <>
         <LoginScreen auth={auth} googleWebClientId={googleWebClientId} />
+        <StatusBar style="auto" />
+      </>
+    );
+  }
+
+  if (user && !user.householdId) {
+    return (
+      <>
+        <HouseholdSetupScreen db={db} onCompleted={refreshUser} user={user} />
         <StatusBar style="auto" />
       </>
     );
