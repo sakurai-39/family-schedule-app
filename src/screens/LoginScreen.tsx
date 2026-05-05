@@ -5,21 +5,27 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { Auth } from 'firebase/auth';
 import { handleGoogleAuthSessionResult, signInWithAppleAsync } from '../services/oauthSignIn';
+import {
+  buildGoogleAuthRequestConfig,
+  getGoogleClientIdForPlatform,
+  GoogleClientIds,
+} from '../utils/googleAuthConfig';
 
 WebBrowser.maybeCompleteAuthSession();
 
 type LoginScreenProps = {
   auth: Auth;
-  googleWebClientId?: string;
+  googleClientIds: GoogleClientIds;
 };
 
-export function LoginScreen({ auth, googleWebClientId }: LoginScreenProps) {
+export function LoginScreen({ auth, googleClientIds }: LoginScreenProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const [isSigningInWithApple, setIsSigningInWithApple] = useState(false);
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
-    webClientId: googleWebClientId,
-  });
+  const platformGoogleClientId = getGoogleClientIdForPlatform(Platform.OS, googleClientIds);
+  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest(
+    buildGoogleAuthRequestConfig(googleClientIds)
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -54,7 +60,7 @@ export function LoginScreen({ auth, googleWebClientId }: LoginScreenProps) {
     })();
   }, [auth, googleResponse]);
 
-  const canUseGoogle = Boolean(googleWebClientId && googleRequest);
+  const canUseGoogle = Boolean(platformGoogleClientId && googleRequest);
 
   const handleGooglePress = async () => {
     setErrorMessage(null);
@@ -108,8 +114,8 @@ export function LoginScreen({ auth, googleWebClientId }: LoginScreenProps) {
           ) : null}
         </View>
 
-        {!googleWebClientId ? (
-          <Text style={styles.notice}>Google サインイン設定が未設定です</Text>
+        {!platformGoogleClientId ? (
+          <Text style={styles.notice}>この端末の Google サインイン設定が未設定です</Text>
         ) : null}
         {isSigningInWithApple ? <Text style={styles.notice}>Apple で確認中です</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}

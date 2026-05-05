@@ -7,6 +7,8 @@ import { HouseholdSetupScreen } from './src/screens/HouseholdSetupScreen';
 import { InviteScreen } from './src/screens/InviteScreen';
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 export default function App() {
   return (
@@ -33,7 +35,14 @@ function AppContent() {
   if (!firebaseUser) {
     return (
       <>
-        <LoginScreen auth={auth} googleWebClientId={googleWebClientId} />
+        <LoginScreen
+          auth={auth}
+          googleClientIds={{
+            webClientId: googleWebClientId,
+            androidClientId: googleAndroidClientId,
+            iosClientId: googleIosClientId,
+          }}
+        />
         <StatusBar style="auto" />
       </>
     );
