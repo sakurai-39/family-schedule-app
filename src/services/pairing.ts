@@ -1,5 +1,7 @@
 import { getRandomValues } from 'expo-crypto';
-import { INVITE_CODE_LENGTH } from '../types/Household';
+import { doc, Firestore, updateDoc } from 'firebase/firestore';
+import { INVITE_CODE_EXPIRY_HOURS, INVITE_CODE_LENGTH } from '../types/Household';
+import { validateInviteCode } from '../utils/validation';
 
 const INVITE_CODE_RANGE = 10 ** INVITE_CODE_LENGTH;
 const UINT32_RANGE = 0x100000000;
@@ -24,4 +26,33 @@ export function generateInviteCodeValue(
       return String(value % INVITE_CODE_RANGE).padStart(INVITE_CODE_LENGTH, '0');
     }
   }
+}
+
+export type GenerateInviteCodeOptions = {
+  generateCode?: () => string;
+  now?: () => Date;
+};
+
+export async function generateInviteCode(
+  db: Firestore,
+  householdId: string,
+  options: GenerateInviteCodeOptions = {}
+): Promise<string> {
+  const generateCode = options.generateCode ?? generateInviteCodeValue;
+  const now = options.now ?? (() => new Date());
+  const code = generateCode();
+  const validation = validateInviteCode(code);
+
+  if (!validation.ok) {
+    throw new Error(validation.reason);
+  }
+
+  const inviteCodeExpiresAt = new Date(now().getTime() + INVITE_CODE_EXPIRY_HOURS * 60 * 60 * 1000);
+
+  await updateDoc(doc(db, 'households', householdId), {
+    inviteCode: code,
+    inviteCodeExpiresAt,
+  });
+
+  return code;
 }
