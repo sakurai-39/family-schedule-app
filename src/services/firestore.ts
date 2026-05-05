@@ -39,9 +39,11 @@ export type CreateUserInput = {
 
 export async function createUser(db: Firestore, input: CreateUserInput): Promise<void> {
   const sanitizedDisplayName = sanitizeText(input.displayName);
-  const result = validateDisplayName(sanitizedDisplayName);
-  if (!result.ok) {
-    throw new Error(result.reason);
+  if (sanitizedDisplayName.length > 0) {
+    const result = validateDisplayName(sanitizedDisplayName);
+    if (!result.ok) {
+      throw new Error(result.reason);
+    }
   }
 
   await setDoc(doc(db, 'users', input.userId), {
