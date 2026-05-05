@@ -4,6 +4,7 @@ import { auth, db } from './src/services/firebase';
 import { AuthProvider, useAuth } from './src/hooks/useAuthFlow';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { HouseholdSetupScreen } from './src/screens/HouseholdSetupScreen';
+import { InviteScreen } from './src/screens/InviteScreen';
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
@@ -48,19 +49,25 @@ function AppContent() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>家族スケジュール管理アプリ</Text>
-      <Text style={styles.status}>ログイン: OK</Text>
-      <Text style={styles.status}>呼び名: {user?.displayName || '未設定'}</Text>
-      <Text style={styles.status}>家族: {user?.householdId ? '作成済み' : '未作成'}</Text>
-      <Text style={styles.status}>Firebase Auth: {authReady ? 'OK' : 'NG'}</Text>
-      <Text style={styles.status}>Firestore: {dbReady ? 'OK' : 'NG'}</Text>
-      {error ? <Text style={styles.errorText}>ユーザー情報の読み込みに失敗しました</Text> : null}
-      <Pressable accessibilityRole="button" onPress={signOut} style={styles.signOutButton}>
-        <Text style={styles.signOutButtonText}>サインアウト</Text>
-      </Pressable>
+    <>
+      {user ? (
+        <InviteScreen db={db} onSignOut={signOut} user={user} />
+      ) : (
+        <View style={styles.container}>
+          <Text style={styles.title}>家族スケジュール管理アプリ</Text>
+          <Text style={styles.status}>ログイン: OK</Text>
+          <Text style={styles.status}>Firebase Auth: {authReady ? 'OK' : 'NG'}</Text>
+          <Text style={styles.status}>Firestore: {dbReady ? 'OK' : 'NG'}</Text>
+          {error ? (
+            <Text style={styles.errorText}>ユーザー情報の読み込みに失敗しました</Text>
+          ) : null}
+          <Pressable accessibilityRole="button" onPress={signOut} style={styles.signOutButton}>
+            <Text style={styles.signOutButtonText}>サインアウト</Text>
+          </Pressable>
+        </View>
+      )}
       <StatusBar style="auto" />
-    </View>
+    </>
   );
 }
 
