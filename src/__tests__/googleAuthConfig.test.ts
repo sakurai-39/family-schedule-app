@@ -1,6 +1,7 @@
 import {
   buildGoogleAuthRequestConfig,
   getGoogleClientIdForPlatform,
+  getGoogleSignInStrategy,
 } from '../utils/googleAuthConfig';
 
 describe('getGoogleClientIdForPlatform', () => {
@@ -31,5 +32,16 @@ describe('buildGoogleAuthRequestConfig', () => {
       androidClientId: 'web-client',
       iosClientId: 'web-client',
     });
+  });
+});
+
+describe('getGoogleSignInStrategy', () => {
+  it('uses native Google Sign-In on Android development builds', () => {
+    expect(getGoogleSignInStrategy('android')).toBe('native');
+  });
+
+  it('keeps AuthSession on iOS and web', () => {
+    expect(getGoogleSignInStrategy('ios')).toBe('auth-session');
+    expect(getGoogleSignInStrategy('web')).toBe('auth-session');
   });
 });
