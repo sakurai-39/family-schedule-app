@@ -10,6 +10,7 @@ import {
   collection,
   addDoc,
   arrayUnion,
+  writeBatch,
   query,
   where,
   getDocs,
@@ -110,6 +111,36 @@ export async function createHousehold(db: Firestore, creatorUserId: string): Pro
     inviteCodeExpiresAt: null,
   });
   return ref.id;
+}
+
+export async function createHouseholdForUser(
+  db: Firestore,
+  userId: string,
+  displayName: string
+): Promise<string> {
+  const sanitizedDisplayName = sanitizeText(displayName);
+  const result = validateDisplayName(sanitizedDisplayName);
+  if (!result.ok) {
+    throw new Error(result.reason);
+  }
+
+  const householdRef = doc(collection(db, 'households'));
+  const batch = writeBatch(db);
+
+  batch.set(householdRef, {
+    members: [userId],
+    createdAt: serverTimestamp(),
+    inviteCode: null,
+    inviteCodeExpiresAt: null,
+  });
+  batch.update(doc(db, 'users', userId), {
+    displayName: sanitizedDisplayName,
+    householdId: householdRef.id,
+  });
+
+  await batch.commit();
+
+  return householdRef.id;
 }
 
 export async function getHousehold(db: Firestore, householdId: string): Promise<Household | null> {
