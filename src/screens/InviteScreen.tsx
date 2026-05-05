@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
@@ -14,8 +15,9 @@ export function InviteScreen({ db, user, onSignOut }: InviteScreenProps) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const canShare = inviteCode !== null;
+  const canUseCode = inviteCode !== null;
 
   const handleGenerate = async () => {
     if (!user.householdId) {
@@ -24,15 +26,30 @@ export function InviteScreen({ db, user, onSignOut }: InviteScreenProps) {
     }
 
     setErrorMessage(null);
+    setStatusMessage(null);
     setIsGenerating(true);
 
     try {
       const code = await generateInviteCode(db, user.householdId);
       setInviteCode(code);
+      setStatusMessage('招待コードを発行しました。');
     } catch {
       setErrorMessage('招待コードの発行に失敗しました。時間をおいて再度お試しください。');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!inviteCode) return;
+
+    try {
+      await Clipboard.setStringAsync(inviteCode);
+      setErrorMessage(null);
+      setStatusMessage('招待コードをコピーしました。');
+    } catch {
+      setStatusMessage(null);
+      setErrorMessage('招待コードのコピーに失敗しました。');
     }
   };
 
@@ -56,6 +73,7 @@ export function InviteScreen({ db, user, onSignOut }: InviteScreenProps) {
           <Text style={styles.helperText}>有効期限: 発行から24時間</Text>
         </View>
 
+        {statusMessage ? <Text style={styles.statusText}>{statusMessage}</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
         <Pressable
@@ -75,12 +93,25 @@ export function InviteScreen({ db, user, onSignOut }: InviteScreenProps) {
 
         <Pressable
           accessibilityRole="button"
-          disabled={!canShare}
+          disabled={!canUseCode}
+          onPress={handleCopy}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            !canUseCode && styles.disabledButton,
+            pressed && canUseCode && styles.pressedButton,
+          ]}
+        >
+          <Text style={styles.secondaryButtonText}>コピー</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={!canUseCode}
           onPress={handleShare}
           style={({ pressed }) => [
             styles.secondaryButton,
-            !canShare && styles.disabledButton,
-            pressed && canShare && styles.pressedButton,
+            !canUseCode && styles.disabledButton,
+            pressed && canUseCode && styles.pressedButton,
           ]}
         >
           <Text style={styles.secondaryButtonText}>共有</Text>
@@ -137,6 +168,11 @@ const styles = StyleSheet.create({
   helperText: {
     color: '#68706b',
     fontSize: 13,
+  },
+  statusText: {
+    color: '#205f4b',
+    fontSize: 14,
+    lineHeight: 20,
   },
   errorText: {
     color: '#b42318',
