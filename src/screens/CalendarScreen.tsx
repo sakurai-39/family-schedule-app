@@ -21,13 +21,22 @@ type CalendarScreenProps = {
   user: User;
   onSignOut: () => Promise<void> | void;
   onOpenInvite: () => void;
+  onOpenInbox: () => void;
+  onOpenItem: (item: CalendarItem) => void;
 };
 
 type CalendarTab = 'today' | 'todo';
 
 const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
 
-export function CalendarScreen({ db, user, onSignOut, onOpenInvite }: CalendarScreenProps) {
+export function CalendarScreen({
+  db,
+  user,
+  onSignOut,
+  onOpenInvite,
+  onOpenInbox,
+  onOpenItem,
+}: CalendarScreenProps) {
   const householdId = user.householdId;
   const today = useMemo(() => new Date(), []);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -91,6 +100,9 @@ export function CalendarScreen({ db, user, onSignOut, onOpenInvite }: CalendarSc
             <Text style={styles.title}>{formatDateHeading(selectedDate)}</Text>
           </View>
           <View style={styles.headerActions}>
+            <Pressable accessibilityRole="button" onPress={onOpenInbox} style={styles.headerButton}>
+              <Text style={styles.headerButtonText}>メモ</Text>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={onOpenInvite}
@@ -223,6 +235,7 @@ export function CalendarScreen({ db, user, onSignOut, onOpenInvite }: CalendarSc
                 isUpdating={updatingItemId === item.itemId}
                 item={item}
                 key={item.itemId}
+                onPress={onOpenItem}
                 onToggleCompleted={handleToggleCompleted}
               />
             );
@@ -251,6 +264,7 @@ export function CalendarScreen({ db, user, onSignOut, onOpenInvite }: CalendarSc
                       isUpdating={updatingItemId === item.itemId}
                       item={item}
                       key={item.itemId}
+                      onPress={onOpenItem}
                       onToggleCompleted={handleToggleCompleted}
                     />
                   );

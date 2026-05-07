@@ -7,10 +7,19 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { HouseholdSetupScreen } from './src/screens/HouseholdSetupScreen';
 import { InviteScreen } from './src/screens/InviteScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
+import { InboxScreen } from './src/screens/InboxScreen';
+import { CalendarItemEditScreen } from './src/screens/CalendarItemEditScreen';
+import { CalendarItem } from './src/types/CalendarItem';
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+type ActiveScreen =
+  | { name: 'calendar' }
+  | { name: 'invite' }
+  | { name: 'inbox' }
+  | { name: 'edit'; item: CalendarItem };
 
 export default function App() {
   return (
@@ -22,12 +31,12 @@ export default function App() {
 
 function AppContent() {
   const { firebaseUser, user, isLoading, error, refreshUser, signOut } = useAuth();
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>({ name: 'calendar' });
   const authReady = auth !== undefined;
   const dbReady = db !== undefined;
 
   useEffect(() => {
-    setIsInviteOpen(false);
+    setActiveScreen({ name: 'calendar' });
   }, [user?.userId, user?.householdId]);
 
   if (isLoading) {
@@ -67,17 +76,39 @@ function AppContent() {
   return (
     <>
       {user ? (
-        isInviteOpen ? (
+        activeScreen.name === 'invite' ? (
           <InviteScreen
             db={db}
-            onBack={() => setIsInviteOpen(false)}
+            onBack={() => setActiveScreen({ name: 'calendar' })}
             onSignOut={signOut}
+            user={user}
+          />
+        ) : activeScreen.name === 'inbox' ? (
+          <InboxScreen
+            db={db}
+            onBack={() => setActiveScreen({ name: 'calendar' })}
+            onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
+            user={user}
+          />
+        ) : activeScreen.name === 'edit' ? (
+          <CalendarItemEditScreen
+            db={db}
+            item={activeScreen.item}
+            onBack={() =>
+              setActiveScreen(
+                activeScreen.item.status === 'inbox' ? { name: 'inbox' } : { name: 'calendar' }
+              )
+            }
+            onDeleted={() => setActiveScreen({ name: 'calendar' })}
+            onSaved={() => setActiveScreen({ name: 'calendar' })}
             user={user}
           />
         ) : (
           <CalendarScreen
             db={db}
-            onOpenInvite={() => setIsInviteOpen(true)}
+            onOpenInbox={() => setActiveScreen({ name: 'inbox' })}
+            onOpenInvite={() => setActiveScreen({ name: 'invite' })}
+            onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             onSignOut={signOut}
             user={user}
           />
