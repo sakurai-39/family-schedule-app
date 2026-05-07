@@ -12,6 +12,7 @@ import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { ensureUserDocument, signOutUser, subscribeAuthState } from '../services/auth';
 import { getUser } from '../services/firestore';
+import { signOutNativeGoogleAsync } from '../services/oauthSignIn';
 
 export async function loadSignedInUser(db: Firestore, firebaseUser: FirebaseUser): Promise<User> {
   await ensureUserDocument(db, firebaseUser);
@@ -118,7 +119,7 @@ export function AuthProvider({ auth, db, children }: AuthProviderProps) {
       isLoading,
       error,
       refreshUser,
-      signOut: () => signOutUser(auth),
+      signOut: () => signOutUser(auth, signOutNativeGoogleAsync),
     }),
     [auth, error, firebaseUser, isLoading, refreshUser, user]
   );

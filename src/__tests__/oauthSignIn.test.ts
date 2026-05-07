@@ -6,6 +6,7 @@ import {
   handleGoogleAuthSessionResult,
   signInWithAppleAsync,
   signInWithNativeGoogleAsync,
+  signOutNativeGoogleAsync,
 } from '../services/oauthSignIn';
 import { createAppleNoncePair } from '../utils/oauthNonce';
 
@@ -34,6 +35,7 @@ jest.mock(
           data: { idToken: 'native-google-id-token' },
         })
       ),
+      signOut: jest.fn(() => Promise.resolve()),
     },
     isSuccessResponse: (response: { type: string }) => response.type === 'success',
   }),
@@ -75,6 +77,7 @@ beforeEach(() => {
     type: 'success',
     data: { idToken: 'native-google-id-token' },
   } as never);
+  mockedGoogleSignin.signOut.mockResolvedValue(null);
 });
 
 describe('handleGoogleAuthSessionResult', () => {
@@ -158,6 +161,14 @@ describe('signInWithNativeGoogleAsync', () => {
     );
 
     expect(mockedGoogleSignin.signIn).not.toHaveBeenCalled();
+  });
+});
+
+describe('signOutNativeGoogleAsync', () => {
+  it('signs out from native Google Sign-In', async () => {
+    await signOutNativeGoogleAsync();
+
+    expect(mockedGoogleSignin.signOut).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -95,6 +95,26 @@ describe('auth service', () => {
     expect(mockedSignOut).toHaveBeenCalledWith(auth);
   });
 
+  it('signs out from external providers before Firebase Auth', async () => {
+    const auth = { name: 'auth' } as never;
+    const signOutFromExternalProvider = jest.fn(() => Promise.resolve());
+
+    await signOutUser(auth, signOutFromExternalProvider);
+
+    expect(signOutFromExternalProvider).toHaveBeenCalledTimes(1);
+    expect(mockedSignOut).toHaveBeenCalledWith(auth);
+  });
+
+  it('still signs out from Firebase Auth when external provider sign-out fails', async () => {
+    const auth = { name: 'auth' } as never;
+    const signOutFromExternalProvider = jest.fn(() => Promise.reject(new Error('Google failed')));
+
+    await signOutUser(auth, signOutFromExternalProvider);
+
+    expect(signOutFromExternalProvider).toHaveBeenCalledTimes(1);
+    expect(mockedSignOut).toHaveBeenCalledWith(auth);
+  });
+
   it('subscribes to Firebase Auth state changes', () => {
     const auth = { name: 'auth' } as never;
     const callback = jest.fn();

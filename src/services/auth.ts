@@ -45,8 +45,19 @@ export async function signInWithAppleIdentityToken(
   return signInWithCredential(auth, credential);
 }
 
-export function signOutUser(auth: Auth): Promise<void> {
-  return signOut(auth);
+export type ExternalProviderSignOut = () => Promise<void>;
+
+export async function signOutUser(
+  auth: Auth,
+  signOutFromExternalProvider?: ExternalProviderSignOut
+): Promise<void> {
+  try {
+    await signOutFromExternalProvider?.();
+  } catch {
+    // Firebase Auth sign-out must still run so the local app session is cleared.
+  }
+
+  await signOut(auth);
 }
 
 export function subscribeAuthState(

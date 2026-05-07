@@ -10,6 +10,10 @@ jest.mock('../services/firestore', () => ({
   getUser: jest.fn(),
 }));
 
+jest.mock('../services/oauthSignIn', () => ({
+  signOutNativeGoogleAsync: jest.fn(() => Promise.resolve()),
+}));
+
 const mockedEnsureUserDocument = jest.mocked(ensureUserDocument);
 const mockedGetUser = jest.mocked(getUser);
 
