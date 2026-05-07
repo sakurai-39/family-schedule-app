@@ -3,6 +3,8 @@
 # dependencies
 node_modules/
 .npm-cache/
+.eas-appdata/
+.eas-localappdata/
 
 # Expo
 .expo/
