@@ -46,6 +46,10 @@ export async function signInWithNativeGoogleAsync(auth: Auth, webClientId: strin
   await signInWithGoogleIdToken(auth, idToken);
 }
 
+export async function signOutNativeGoogleAsync(): Promise<void> {
+  await GoogleSignin.signOut();
+}
+
 export async function signInWithAppleAsync(auth: Auth): Promise<void> {
   const isAvailable = await AppleAuthentication.isAvailableAsync();
   if (!isAvailable) {
