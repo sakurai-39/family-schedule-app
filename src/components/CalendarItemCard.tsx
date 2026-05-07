@@ -1,0 +1,140 @@
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CalendarItem } from '../types/CalendarItem';
+import { AssigneeBadge, AssigneeBadgeTone } from './AssigneeBadge';
+
+type CalendarItemCardProps = {
+  item: CalendarItem;
+  assigneeLabel: string;
+  assigneeTone: AssigneeBadgeTone;
+  onToggleCompleted: (item: CalendarItem) => Promise<void> | void;
+  isUpdating?: boolean;
+};
+
+export function CalendarItemCard({
+  item,
+  assigneeLabel,
+  assigneeTone,
+  onToggleCompleted,
+  isUpdating = false,
+}: CalendarItemCardProps) {
+  const itemKindLabel = item.type === 'event' ? '予定' : item.dueAt ? 'タスク' : 'やること';
+  const timeLabel = formatItemTime(item);
+
+  return (
+    <View
+      style={[
+        styles.card,
+        item.type === 'event' ? styles.eventCard : item.dueAt ? styles.taskCard : styles.todoCard,
+        item.isCompleted && styles.completedCard,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: item.isCompleted, disabled: isUpdating }}
+        disabled={isUpdating}
+        onPress={() => onToggleCompleted(item)}
+        style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}
+      >
+        <Text style={styles.checkboxText}>{item.isCompleted ? '✓' : ''}</Text>
+      </Pressable>
+
+      <View style={styles.body}>
+        <View style={styles.metaRow}>
+          <Text style={styles.kindLabel}>{itemKindLabel}</Text>
+          {timeLabel ? <Text style={styles.timeLabel}>{timeLabel}</Text> : null}
+        </View>
+        <Text style={[styles.title, item.isCompleted && styles.completedTitle]}>{item.title}</Text>
+        {item.memo ? <Text style={styles.memo}>{item.memo}</Text> : null}
+        <AssigneeBadge label={assigneeLabel} tone={assigneeTone} />
+      </View>
+    </View>
+  );
+}
+
+function formatItemTime(item: CalendarItem): string | null {
+  const date = item.startAt ?? item.dueAt;
+  if (!date) return null;
+
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d8ded9',
+    borderLeftWidth: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  eventCard: {
+    borderLeftColor: '#1f6b54',
+  },
+  taskCard: {
+    borderLeftColor: '#426b9f',
+  },
+  todoCard: {
+    borderLeftColor: '#b98712',
+  },
+  completedCard: {
+    opacity: 0.62,
+  },
+  checkbox: {
+    alignItems: 'center',
+    borderColor: '#9aa49e',
+    borderRadius: 11,
+    borderWidth: 2,
+    height: 22,
+    justifyContent: 'center',
+    marginTop: 2,
+    width: 22,
+  },
+  checkboxChecked: {
+    backgroundColor: '#205f4b',
+    borderColor: '#205f4b',
+  },
+  checkboxText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  body: {
+    flex: 1,
+    gap: 8,
+  },
+  metaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  kindLabel: {
+    color: '#5e6761',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  timeLabel: {
+    color: '#5e6761',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+  },
+  title: {
+    color: '#202124',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 23,
+  },
+  completedTitle: {
+    textDecorationLine: 'line-through',
+  },
+  memo: {
+    color: '#5d625e',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+});

@@ -15,6 +15,7 @@ import {
   where,
   getDocs,
   orderBy,
+  onSnapshot,
 } from 'firebase/firestore';
 import { User } from '../types/User';
 import { Household, HOUSEHOLD_MAX_MEMBERS } from '../types/Household';
@@ -30,6 +31,39 @@ import {
   sanitizeText,
   isValidScheduledItem,
 } from '../utils/validation';
+
+type CalendarItemData = Record<string, unknown>;
+
+function toNullableDate(raw: unknown): Date | null {
+  if (raw instanceof Timestamp) return raw.toDate();
+  if (raw instanceof Date) return raw;
+  return null;
+}
+
+function toRequiredDate(raw: unknown): Date {
+  if (raw instanceof Timestamp) return raw.toDate();
+  if (raw instanceof Date) return raw;
+  return new Date(0);
+}
+
+function calendarItemFromData(itemId: string, data: CalendarItemData): CalendarItem {
+  return {
+    itemId,
+    status: data.status as CalendarItem['status'],
+    type: (data.type as CalendarItem['type']) ?? null,
+    title: String(data.title ?? ''),
+    assignee: (data.assignee as CalendarItem['assignee']) ?? null,
+    startAt: toNullableDate(data.startAt),
+    dueAt: toNullableDate(data.dueAt),
+    memo: String(data.memo ?? ''),
+    isCompleted: Boolean(data.isCompleted ?? false),
+    recurrence: null,
+    createdBy: String(data.createdBy ?? ''),
+    inputDurationMs: typeof data.inputDurationMs === 'number' ? data.inputDurationMs : null,
+    createdAt: toRequiredDate(data.createdAt),
+    updatedAt: toRequiredDate(data.updatedAt),
+  };
+}
 
 export type CreateUserInput = {
   userId: string;
@@ -251,46 +285,7 @@ export async function getCalendarItem(
   if (!snap.exists()) {
     return null;
   }
-  const data = snap.data();
-
-  const toDate = (raw: unknown): Date | null => {
-    if (raw instanceof Timestamp) return raw.toDate();
-    if (raw instanceof Date) return raw;
-    return null;
-  };
-
-  const createdAtRaw = data.createdAt;
-  const createdAt =
-    createdAtRaw instanceof Timestamp
-      ? createdAtRaw.toDate()
-      : createdAtRaw instanceof Date
-        ? createdAtRaw
-        : new Date(0);
-
-  const updatedAtRaw = data.updatedAt;
-  const updatedAt =
-    updatedAtRaw instanceof Timestamp
-      ? updatedAtRaw.toDate()
-      : updatedAtRaw instanceof Date
-        ? updatedAtRaw
-        : new Date(0);
-
-  return {
-    itemId,
-    status: data.status,
-    type: data.type ?? null,
-    title: data.title,
-    assignee: data.assignee ?? null,
-    startAt: toDate(data.startAt),
-    dueAt: toDate(data.dueAt),
-    memo: data.memo ?? '',
-    isCompleted: data.isCompleted ?? false,
-    recurrence: null,
-    createdBy: data.createdBy,
-    inputDurationMs: data.inputDurationMs ?? null,
-    createdAt,
-    updatedAt,
-  };
+  return calendarItemFromData(itemId, snap.data());
 }
 
 export async function promoteInboxToScheduled(
@@ -397,45 +392,25 @@ export async function listCalendarItems(
   const q = query(colRef, ...constraints);
   const snap = await getDocs(q);
 
-  const toDate = (raw: unknown): Date | null => {
-    if (raw instanceof Timestamp) return raw.toDate();
-    if (raw instanceof Date) return raw;
-    return null;
-  };
+  return snap.docs.map((d) => calendarItemFromData(d.id, d.data()));
+}
 
-  return snap.docs.map((d) => {
-    const data = d.data();
-    const createdAtRaw = data.createdAt;
-    const createdAt =
-      createdAtRaw instanceof Timestamp
-        ? createdAtRaw.toDate()
-        : createdAtRaw instanceof Date
-          ? createdAtRaw
-          : new Date(0);
+export function subscribeCalendarItems(
+  db: Firestore,
+  householdId: string,
+  onItems: (items: CalendarItem[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  const colRef = collection(db, `households/${householdId}/calendar_items`);
+  const q = query(colRef, where('status', '==', 'scheduled'));
 
-    const updatedAtRaw = data.updatedAt;
-    const updatedAt =
-      updatedAtRaw instanceof Timestamp
-        ? updatedAtRaw.toDate()
-        : updatedAtRaw instanceof Date
-          ? updatedAtRaw
-          : new Date(0);
-
-    return {
-      itemId: d.id,
-      status: data.status,
-      type: data.type ?? null,
-      title: data.title,
-      assignee: data.assignee ?? null,
-      startAt: toDate(data.startAt),
-      dueAt: toDate(data.dueAt),
-      memo: data.memo ?? '',
-      isCompleted: data.isCompleted ?? false,
-      recurrence: null,
-      createdBy: data.createdBy,
-      inputDurationMs: data.inputDurationMs ?? null,
-      createdAt,
-      updatedAt,
-    };
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      onItems(snap.docs.map((d) => calendarItemFromData(d.id, d.data())));
+    },
+    (error) => {
+      onError?.(error instanceof Error ? error : new Error('calendar subscription failed'));
+    }
+  );
 }

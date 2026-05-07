@@ -9,9 +9,10 @@ type InviteScreenProps = {
   db: Firestore;
   user: User;
   onSignOut: () => Promise<void> | void;
+  onBack?: () => void;
 };
 
-export function InviteScreen({ db, user, onSignOut }: InviteScreenProps) {
+export function InviteScreen({ db, user, onSignOut, onBack }: InviteScreenProps) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -120,6 +121,12 @@ export function InviteScreen({ db, user, onSignOut }: InviteScreenProps) {
         <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.textButton}>
           <Text style={styles.textButtonText}>サインアウト</Text>
         </Pressable>
+
+        {onBack ? (
+          <Pressable accessibilityRole="button" onPress={onBack} style={styles.textButton}>
+            <Text style={styles.textButtonText}>カレンダーへ戻る</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
