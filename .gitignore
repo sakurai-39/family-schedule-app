@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules/
+.npm-cache/
 
 # Expo
 .expo/
@@ -66,3 +67,5 @@ firestore-debug.log
 firebase-debug.log
 .firebase/
 ui-debug.log
+google-services.json
+GoogleService-Info.plist

@@ -4,10 +4,15 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { Auth } from 'firebase/auth';
-import { handleGoogleAuthSessionResult, signInWithAppleAsync } from '../services/oauthSignIn';
+import {
+  handleGoogleAuthSessionResult,
+  signInWithAppleAsync,
+  signInWithNativeGoogleAsync,
+} from '../services/oauthSignIn';
 import {
   buildGoogleAuthRequestConfig,
   getGoogleClientIdForPlatform,
+  getGoogleSignInStrategy,
   GoogleClientIds,
 } from '../utils/googleAuthConfig';
 
@@ -22,7 +27,11 @@ export function LoginScreen({ auth, googleClientIds }: LoginScreenProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const [isSigningInWithApple, setIsSigningInWithApple] = useState(false);
-  const platformGoogleClientId = getGoogleClientIdForPlatform(Platform.OS, googleClientIds);
+  const googleSignInStrategy = getGoogleSignInStrategy(Platform.OS);
+  const isNativeGoogleSignIn = googleSignInStrategy === 'native';
+  const platformGoogleClientId = isNativeGoogleSignIn
+    ? googleClientIds.webClientId
+    : getGoogleClientIdForPlatform(Platform.OS, googleClientIds);
   const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest(
     buildGoogleAuthRequestConfig(googleClientIds)
   );
@@ -60,11 +69,18 @@ export function LoginScreen({ auth, googleClientIds }: LoginScreenProps) {
     })();
   }, [auth, googleResponse]);
 
-  const canUseGoogle = Boolean(platformGoogleClientId && googleRequest);
+  const canUseGoogle = isNativeGoogleSignIn
+    ? Boolean(googleClientIds.webClientId)
+    : Boolean(platformGoogleClientId && googleRequest);
 
   const handleGooglePress = async () => {
     setErrorMessage(null);
     try {
+      if (isNativeGoogleSignIn) {
+        await signInWithNativeGoogleAsync(auth, googleClientIds.webClientId ?? '');
+        return;
+      }
+
       await promptGoogleAsync();
     } catch {
       setErrorMessage('Google サインインに失敗しました');

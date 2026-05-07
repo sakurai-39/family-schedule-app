@@ -4,6 +4,12 @@ export type GoogleClientIds = {
   iosClientId?: string;
 };
 
+export type GoogleSignInStrategy = 'native' | 'auth-session';
+
+export function getGoogleSignInStrategy(platform: string): GoogleSignInStrategy {
+  return platform === 'android' ? 'native' : 'auth-session';
+}
+
 export function getGoogleClientIdForPlatform(
   platform: string,
   clientIds: GoogleClientIds

@@ -1,7 +1,12 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthSessionResult } from 'expo-auth-session';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { signInWithAppleIdentityToken, signInWithGoogleIdToken } from '../services/auth';
-import { handleGoogleAuthSessionResult, signInWithAppleAsync } from '../services/oauthSignIn';
+import {
+  handleGoogleAuthSessionResult,
+  signInWithAppleAsync,
+  signInWithNativeGoogleAsync,
+} from '../services/oauthSignIn';
 import { createAppleNoncePair } from '../utils/oauthNonce';
 
 jest.mock('expo-apple-authentication', () => ({
@@ -16,6 +21,24 @@ jest.mock('expo-apple-authentication', () => ({
     })
   ),
 }));
+
+jest.mock(
+  '@react-native-google-signin/google-signin',
+  () => ({
+    GoogleSignin: {
+      configure: jest.fn(),
+      hasPlayServices: jest.fn(() => Promise.resolve(true)),
+      signIn: jest.fn(() =>
+        Promise.resolve({
+          type: 'success',
+          data: { idToken: 'native-google-id-token' },
+        })
+      ),
+    },
+    isSuccessResponse: (response: { type: string }) => response.type === 'success',
+  }),
+  { virtual: true }
+);
 
 jest.mock('../services/auth', () => ({
   signInWithAppleIdentityToken: jest.fn(() => Promise.resolve()),
@@ -32,6 +55,7 @@ jest.mock('../utils/oauthNonce', () => ({
 }));
 
 const mockedAppleAuthentication = jest.mocked(AppleAuthentication);
+const mockedGoogleSignin = jest.mocked(GoogleSignin);
 const mockedSignInWithAppleIdentityToken = jest.mocked(signInWithAppleIdentityToken);
 const mockedSignInWithGoogleIdToken = jest.mocked(signInWithGoogleIdToken);
 const mockedCreateAppleNoncePair = jest.mocked(createAppleNoncePair);
@@ -46,6 +70,11 @@ beforeEach(() => {
     rawNonce: 'raw-nonce',
     hashedNonce: 'hashed-nonce',
   });
+  mockedGoogleSignin.hasPlayServices.mockResolvedValue(true);
+  mockedGoogleSignin.signIn.mockResolvedValue({
+    type: 'success',
+    data: { idToken: 'native-google-id-token' },
+  } as never);
 });
 
 describe('handleGoogleAuthSessionResult', () => {
@@ -82,6 +111,53 @@ describe('handleGoogleAuthSessionResult', () => {
     await expect(handleGoogleAuthSessionResult({} as never, response)).rejects.toThrow(
       'Google ID token was not returned'
     );
+  });
+});
+
+describe('signInWithNativeGoogleAsync', () => {
+  it('signs in with a native Google id token', async () => {
+    const auth = { name: 'auth' } as never;
+
+    await signInWithNativeGoogleAsync(auth, 'web-client-id');
+
+    expect(mockedGoogleSignin.configure).toHaveBeenCalledWith({
+      webClientId: 'web-client-id',
+      offlineAccess: false,
+    });
+    expect(mockedGoogleSignin.hasPlayServices).toHaveBeenCalledWith({
+      showPlayServicesUpdateDialog: true,
+    });
+    expect(mockedGoogleSignin.signIn).toHaveBeenCalledTimes(1);
+    expect(mockedSignInWithGoogleIdToken).toHaveBeenCalledWith(auth, 'native-google-id-token');
+  });
+
+  it('does nothing when native Google sign-in is cancelled', async () => {
+    mockedGoogleSignin.signIn.mockResolvedValueOnce({ type: 'cancelled' } as never);
+
+    await signInWithNativeGoogleAsync({} as never, 'web-client-id');
+
+    expect(mockedSignInWithGoogleIdToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects when native Google sign-in returns no id token', async () => {
+    mockedGoogleSignin.signIn.mockResolvedValueOnce({
+      type: 'success',
+      data: { idToken: null },
+    } as never);
+
+    await expect(signInWithNativeGoogleAsync({} as never, 'web-client-id')).rejects.toThrow(
+      'Google ID token was not returned'
+    );
+
+    expect(mockedSignInWithGoogleIdToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the Google web client id is missing', async () => {
+    await expect(signInWithNativeGoogleAsync({} as never, '')).rejects.toThrow(
+      'Google web client ID is required'
+    );
+
+    expect(mockedGoogleSignin.signIn).not.toHaveBeenCalled();
   });
 });
 
