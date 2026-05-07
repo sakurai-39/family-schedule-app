@@ -68,9 +68,159 @@ service cloud.firestore {
       allow update: if isExistingMemberUpdate() || isInviteJoinUpdate();
 
       match /calendar_items/{itemId} {
-        allow read, write: if isSignedIn()
-                           && request.auth.uid in
-                              get(/databases/$(database)/documents/households/$(householdId)).data.members;
+        function householdMembers() {
+          return get(/databases/$(database)/documents/households/$(householdId)).data.members;
+        }
+
+        function isCalendarMember() {
+          return isSignedIn()
+                 && householdMembers() is list
+                 && request.auth.uid in householdMembers();
+        }
+
+        function hasOnlyCalendarItemFields() {
+          return request.resource.data.keys().hasOnly([
+            'status',
+            'type',
+            'title',
+            'assignee',
+            'startAt',
+            'dueAt',
+            'memo',
+            'isCompleted',
+            'recurrence',
+            'createdBy',
+            'inputDurationMs',
+            'createdAt',
+            'updatedAt'
+          ]);
+        }
+
+        function hasAllCalendarItemFields() {
+          return request.resource.data.keys().hasAll([
+            'status',
+            'type',
+            'title',
+            'assignee',
+            'startAt',
+            'dueAt',
+            'memo',
+            'isCompleted',
+            'recurrence',
+            'createdBy',
+            'inputDurationMs',
+            'createdAt',
+            'updatedAt'
+          ]);
+        }
+
+        function isValidTitle(value) {
+          return value is string && value.size() > 0 && value.size() <= 200;
+        }
+
+        function isValidMemo(value) {
+          return value is string && value.size() <= 1000;
+        }
+
+        function isValidInputDuration(value) {
+          return value == null
+                 || (value is int && value >= 0)
+                 || (value is float && value >= 0);
+        }
+
+        function isValidAssignee(value) {
+          return value is string
+                 && (value == 'both'
+                     || value == 'whoever'
+                     || value in householdMembers());
+        }
+
+        function isValidInboxData(data) {
+          return data.status == 'inbox'
+                 && data.type == null
+                 && isValidTitle(data.title)
+                 && data.assignee == null
+                 && data.startAt == null
+                 && data.dueAt == null
+                 && isValidMemo(data.memo)
+                 && data.isCompleted == false
+                 && data.recurrence == null
+                 && data.createdBy == request.auth.uid
+                 && isValidInputDuration(data.inputDurationMs)
+                 && data.createdAt == request.time
+                 && data.updatedAt == request.time;
+        }
+
+        function isValidScheduledEventData(data) {
+          return data.status == 'scheduled'
+                 && data.type == 'event'
+                 && isValidTitle(data.title)
+                 && isValidAssignee(data.assignee)
+                 && data.startAt is timestamp
+                 && data.dueAt == null
+                 && isValidMemo(data.memo)
+                 && data.isCompleted is bool
+                 && data.recurrence == null
+                 && data.createdBy is string
+                 && isValidInputDuration(data.inputDurationMs)
+                 && data.createdAt is timestamp
+                 && data.updatedAt == request.time;
+        }
+
+        function isValidScheduledTaskData(data) {
+          return data.status == 'scheduled'
+                 && data.type == 'task'
+                 && isValidTitle(data.title)
+                 && isValidAssignee(data.assignee)
+                 && data.startAt == null
+                 && (data.dueAt == null || data.dueAt is timestamp)
+                 && isValidMemo(data.memo)
+                 && data.isCompleted is bool
+                 && data.recurrence == null
+                 && data.createdBy is string
+                 && isValidInputDuration(data.inputDurationMs)
+                 && data.createdAt is timestamp
+                 && data.updatedAt == request.time;
+        }
+
+        function isValidScheduledData(data) {
+          return isValidScheduledEventData(data) || isValidScheduledTaskData(data);
+        }
+
+        function preservesImmutableFields() {
+          return request.resource.data.createdBy == resource.data.createdBy
+                 && request.resource.data.createdAt == resource.data.createdAt
+                 && request.resource.data.inputDurationMs == resource.data.inputDurationMs;
+        }
+
+        function isValidInboxCreate() {
+          return hasOnlyCalendarItemFields()
+                 && hasAllCalendarItemFields()
+                 && isValidInboxData(request.resource.data);
+        }
+
+        function isValidInboxToScheduledUpdate() {
+          return resource.data.status == 'inbox'
+                 && hasOnlyCalendarItemFields()
+                 && hasAllCalendarItemFields()
+                 && preservesImmutableFields()
+                 && isValidScheduledData(request.resource.data);
+        }
+
+        function isValidScheduledUpdate() {
+          return resource.data.status == 'scheduled'
+                 && request.resource.data.status == 'scheduled'
+                 && hasOnlyCalendarItemFields()
+                 && hasAllCalendarItemFields()
+                 && preservesImmutableFields()
+                 && isValidScheduledData(request.resource.data);
+        }
+
+        allow read: if isCalendarMember();
+        allow create: if isCalendarMember() && isValidInboxCreate();
+        allow update: if isCalendarMember()
+                      && (isValidInboxToScheduledUpdate() || isValidScheduledUpdate());
+        allow delete: if isCalendarMember();
       }
     }
   }

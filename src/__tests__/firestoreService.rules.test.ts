@@ -251,6 +251,12 @@ describe('inbox/calendar_items service', () => {
       createdBy: 'user-A',
       inputDurationMs: null,
     });
+    await promoteInboxToScheduled(aliceDb, householdId, itemId, {
+      type: 'task',
+      title: 'メモ',
+      assignee: 'user-A',
+      dueAt: null,
+    });
     await updateCalendarItem(aliceDb, householdId, itemId, { memo: '追記内容' });
     const item = await getCalendarItem(aliceDb, householdId, itemId);
     expect(item?.memo).toBe('追記内容');
