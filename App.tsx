@@ -10,6 +10,9 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { InboxScreen } from './src/screens/InboxScreen';
 import { CalendarItemEditScreen } from './src/screens/CalendarItemEditScreen';
 import { CalendarItem } from './src/types/CalendarItem';
+import { configureForegroundNotificationHandling } from './src/services/notifications';
+
+configureForegroundNotificationHandling();
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
