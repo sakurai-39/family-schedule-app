@@ -6,6 +6,7 @@ import { CalendarItem, AssigneeValue } from '../types/CalendarItem';
 import { CalendarItemCard } from '../components/CalendarItemCard';
 import { AssigneeBadgeTone } from '../components/AssigneeBadge';
 import { useCalendarItems } from '../hooks/useCalendarItems';
+import { useNotificationSync } from '../hooks/useNotificationSync';
 import {
   buildMonthGrid,
   getDisplayDate,
@@ -48,6 +49,12 @@ export function CalendarScreen({
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { items, isLoading, errorMessage } = useCalendarItems(db, householdId);
+  const notificationSync = useNotificationSync({
+    householdId,
+    userId: user.userId,
+    items,
+    enabled: !isLoading,
+  });
 
   const monthGrid = useMemo(() => buildMonthGrid(visibleMonth, today), [today, visibleMonth]);
   const itemDateKeys = useMemo(() => {
@@ -61,6 +68,10 @@ export function CalendarScreen({
 
   const selectedItems = useMemo(() => getItemsForDate(items, selectedDate), [items, selectedDate]);
   const undatedTasks = useMemo(() => getUndatedTasks(items), [items]);
+  const openUndatedTaskCount = useMemo(
+    () => undatedTasks.filter((item) => !item.isCompleted).length,
+    [undatedTasks]
+  );
   const visibleItems = activeTab === 'today' ? selectedItems : undatedTasks;
   const { open, completed } = useMemo(() => splitCompletedItems(visibleItems), [visibleItems]);
 
@@ -211,6 +222,21 @@ export function CalendarScreen({
         {isLoading ? <Text style={styles.mutedText}>予定を読み込んでいます。</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+        {notificationSync.errorMessage ? (
+          <Text style={styles.errorText}>{notificationSync.errorMessage}</Text>
+        ) : null}
+
+        {openUndatedTaskCount > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setActiveTab('todo')}
+            style={styles.todoSummaryBanner}
+          >
+            <Text style={styles.todoSummaryBannerText}>
+              やることリストが{openUndatedTaskCount}件あります
+            </Text>
+          </Pressable>
+        ) : null}
 
         {!isLoading && open.length === 0 && completed.length === 0 ? (
           <View style={styles.emptyArea}>
@@ -525,6 +551,20 @@ const styles = StyleSheet.create({
   completedToggleText: {
     color: '#4d5751',
     fontSize: 14,
+    fontWeight: '800',
+  },
+  todoSummaryBanner: {
+    backgroundColor: '#eaf4ee',
+    borderColor: '#b7d2c4',
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  todoSummaryBannerText: {
+    color: '#205f4b',
+    fontSize: 15,
     fontWeight: '800',
   },
 });

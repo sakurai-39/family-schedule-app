@@ -13,7 +13,16 @@ export default ({ config }) => ({
     backgroundColor: '#ffffff',
   },
   assetBundlePatterns: ['**/*'],
-  plugins: ['@react-native-google-signin/google-signin'],
+  plugins: [
+    '@react-native-google-signin/google-signin',
+    [
+      'expo-notifications',
+      {
+        color: '#205f4b',
+        defaultChannel: 'family-schedule-reminders',
+      },
+    ],
+  ],
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.ryou.familyscheduleapp',
