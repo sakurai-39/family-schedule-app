@@ -27,6 +27,7 @@ import {
 } from '../types/CalendarItem';
 import {
   validateDisplayName,
+  validateMemo,
   validateTitle,
   sanitizeText,
   isValidScheduledItem,
@@ -63,6 +64,44 @@ function calendarItemFromData(itemId: string, data: CalendarItemData): CalendarI
     createdAt: toRequiredDate(data.createdAt),
     updatedAt: toRequiredDate(data.updatedAt),
   };
+}
+
+function buildScheduledItemUpdatePayload(draft: ScheduledItemDraft): Record<string, unknown> {
+  if (!isValidScheduledItem(draft)) {
+    throw new Error('Invalid scheduled item draft (missing required fields)');
+  }
+
+  const sanitizedTitle = sanitizeText(draft.title);
+  const sanitizedMemo = draft.memo !== undefined ? sanitizeText(draft.memo) : '';
+  const titleValidation = validateTitle(sanitizedTitle);
+  const memoValidation = validateMemo(sanitizedMemo);
+
+  if (!titleValidation.ok) {
+    throw new Error(titleValidation.reason);
+  }
+
+  if (!memoValidation.ok) {
+    throw new Error(memoValidation.reason);
+  }
+
+  const updates: Record<string, unknown> = {
+    status: 'scheduled',
+    type: draft.type,
+    title: sanitizedTitle,
+    assignee: draft.assignee,
+    memo: sanitizedMemo,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (draft.type === 'event') {
+    updates.startAt = draft.startAt;
+    updates.dueAt = null;
+  } else {
+    updates.startAt = null;
+    updates.dueAt = draft.dueAt;
+  }
+
+  return updates;
 }
 
 export type CreateUserInput = {
@@ -294,30 +333,17 @@ export async function promoteInboxToScheduled(
   itemId: string,
   draft: ScheduledItemDraft
 ): Promise<void> {
-  if (!isValidScheduledItem(draft)) {
-    throw new Error('Invalid scheduled item draft (missing required fields)');
-  }
+  const updates = buildScheduledItemUpdatePayload(draft);
+  await updateDoc(doc(db, `households/${householdId}/calendar_items`, itemId), updates);
+}
 
-  const sanitizedTitle = sanitizeText(draft.title);
-  const sanitizedMemo = draft.memo !== undefined ? sanitizeText(draft.memo) : '';
-
-  const updates: Record<string, unknown> = {
-    status: 'scheduled',
-    type: draft.type,
-    title: sanitizedTitle,
-    assignee: draft.assignee,
-    memo: sanitizedMemo,
-    updatedAt: serverTimestamp(),
-  };
-
-  if (draft.type === 'event') {
-    updates.startAt = draft.startAt;
-    updates.dueAt = null;
-  } else {
-    updates.startAt = null;
-    updates.dueAt = draft.dueAt;
-  }
-
+export async function updateScheduledItem(
+  db: Firestore,
+  householdId: string,
+  itemId: string,
+  draft: ScheduledItemDraft
+): Promise<void> {
+  const updates = buildScheduledItemUpdatePayload(draft);
   await updateDoc(doc(db, `households/${householdId}/calendar_items`, itemId), updates);
 }
 
@@ -411,6 +437,26 @@ export function subscribeCalendarItems(
     },
     (error) => {
       onError?.(error instanceof Error ? error : new Error('calendar subscription failed'));
+    }
+  );
+}
+
+export function subscribeInboxItems(
+  db: Firestore,
+  householdId: string,
+  onItems: (items: CalendarItem[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  const colRef = collection(db, `households/${householdId}/calendar_items`);
+  const q = query(colRef, where('status', '==', 'inbox'));
+
+  return onSnapshot(
+    q,
+    (snap) => {
+      onItems(snap.docs.map((d) => calendarItemFromData(d.id, d.data())));
+    },
+    (error) => {
+      onError?.(error instanceof Error ? error : new Error('inbox subscription failed'));
     }
   );
 }
