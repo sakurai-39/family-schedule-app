@@ -22,6 +22,7 @@ export default ({ config }) => ({
         defaultChannel: 'family-schedule-reminders',
       },
     ],
+    '@react-native-community/datetimepicker',
   ],
   ios: {
     supportsTablet: true,
