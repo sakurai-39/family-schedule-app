@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import {
@@ -51,6 +52,7 @@ export function CalendarItemEditScreen({
   onDeleted,
   onSaved,
 }: CalendarItemEditScreenProps) {
+  const insets = useSafeAreaInsets();
   const householdId = user.householdId;
   const initialKind = useMemo(() => getInitialKind(item), [item]);
   const initialDate = useMemo(() => item.startAt ?? item.dueAt ?? new Date(), [item]);
@@ -152,7 +154,13 @@ export function CalendarItemEditScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <View>
             <Text style={styles.eyebrow}>
@@ -283,9 +291,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 18,
-    paddingBottom: 34,
     paddingHorizontal: 20,
-    paddingTop: 64,
   },
   header: {
     alignItems: 'flex-start',

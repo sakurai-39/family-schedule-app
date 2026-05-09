@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { generateInviteCode } from '../services/pairing';
@@ -63,7 +64,7 @@ export function InviteScreen({ db, user, onSignOut, onBack }: InviteScreenProps)
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>家族に招待</Text>
         <Text style={styles.subtitle}>招待コードを発行して、相手に共有してください。</Text>
@@ -128,7 +129,7 @@ export function InviteScreen({ db, user, onSignOut, onBack }: InviteScreenProps)
           </Pressable>
         ) : null}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

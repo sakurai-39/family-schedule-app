@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { createHouseholdForUser, updateUser } from '../services/firestore';
@@ -52,7 +53,7 @@ export function HouseholdSetupScreen({ db, user, onCompleted }: HouseholdSetupSc
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>呼び名を決める</Text>
         <Text style={styles.subtitle}>ふたりの予定で表示する短い名前を入力してください。</Text>
@@ -126,7 +127,7 @@ export function HouseholdSetupScreen({ db, user, onCompleted }: HouseholdSetupSc
           </Text>
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
