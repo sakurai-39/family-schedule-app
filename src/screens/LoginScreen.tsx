@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -100,7 +101,7 @@ export function LoginScreen({ auth, googleClientIds }: LoginScreenProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>家族スケジュール</Text>
         <Text style={styles.subtitle}>予定とタスクを、ふたりで同じ場所に。</Text>
@@ -136,7 +137,7 @@ export function LoginScreen({ auth, googleClientIds }: LoginScreenProps) {
         {isSigningInWithApple ? <Text style={styles.notice}>Apple で確認中です</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

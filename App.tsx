@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { auth, db } from './src/services/firebase';
 import { AuthProvider, useAuth } from './src/hooks/useAuthFlow';
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -26,9 +27,11 @@ type ActiveScreen =
 
 export default function App() {
   return (
-    <AuthProvider auth={auth} db={db}>
-      <AppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider auth={auth} db={db}>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
