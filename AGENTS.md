@@ -102,6 +102,31 @@
 - 新コレクションの追加時は、デフォルト拒否（`allow read, write: if false;`）から始め、必要な権限だけを open する
 - `@firebase/rules-unit-testing` で**未認証拒否テスト・他家族データ拒否テスト**を必ず書く
 
+### 4-3a. `firestore.rules` 変更時の必須デプロイフロー
+
+`firestore.rules` に変更を含む PR は、以下のすべてを満たして初めて「完了」と扱う：
+
+1. PR が main に merge された
+2. **merge 後すぐ**に `firebase deploy --only firestore:rules` を実行し、出力に `Deploy complete!` を確認した
+3. Firebase Console（`https://console.firebase.google.com/project/family-schedule-app-b768e/firestore/databases/-default-/rules`）で本番のルールが merge 後のローカル `firestore.rules` と一致していることを目視確認した（行数 + 新規関数名の grep）
+4. 当日の `90_Project_Logs/yyyy-mm-dd_log.md` に「本番 Rules デプロイ完了 yyyy-mm-dd hh:mm」を記録した
+5. `plan-N-complete` タグ作成・バックアップ zip 作成 などの完了処理は **本番デプロイ完了の後** に行う
+
+**禁止**：
+
+- PR merge 完了をもって rules 変更も完了したと扱うこと
+- 「動作確認は実機で済んでいるからデプロイは後回し」と判断すること（本番ルールと開発ルールが乖離した状態は MVP でも許容しない）
+
+**根拠**：
+
+- 2026-05-08 に Plan 5（PR #24）でこの手順が省略され、本番ルールが Plan 3 版（77行）のまま、ローカルが Plan 5 強化版（227行）に乖離した状態を 1 日後の Plan 8 セキュリティチェックで発見した。
+- 本ルールは再発防止策として 2026-05-09 に追加した。
+
+**deploy 漏れの検出方法**：
+
+- Firebase Console で `firestore.rules` の行数を見て、ローカル `wc -l firestore.rules` と一致するか
+- 新規追加した関数名（例: `isValidInputDuration`）が Firebase Console のルールエディタで Ctrl+F 検索でヒットするか
+
 ### 4-4. とりあえずメモ機能の特殊ルール
 
 - `status='inbox'` 状態のドキュメントは `type=null`、`assignee=null`、`dueAt=null` を許容する
@@ -289,3 +314,4 @@ PR がマージされた後、ブランチ削除ボタンが表示される。
 |---|---|
 | 2026-05-01 | 初版作成。spec文書（全12章）に対応するAI実装憲法を記述 |
 | 2026-05-05 | Ryouさんへ GitHub 操作を依頼する際のテンプレート（PR作成・マージ・CI確認・ブランチ削除）を追加 |
+| 2026-05-09 | 第4-3a節「`firestore.rules` 変更時の必須デプロイフロー」を追加（Plan 5 で deploy 漏れが発生し、Plan 8 セキュリティチェックで検出した事例の再発防止） |
