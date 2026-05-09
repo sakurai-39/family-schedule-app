@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { CalendarItem, AssigneeValue } from '../types/CalendarItem';
@@ -39,7 +39,6 @@ export function CalendarScreen({
   onOpenInbox,
   onOpenItem,
 }: CalendarScreenProps) {
-  const insets = useSafeAreaInsets();
   const householdId = user.householdId;
   const today = useMemo(() => new Date(), []);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -105,13 +104,8 @@ export function CalendarScreen({
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
-        ]}
-      >
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
             <Text style={styles.eyebrow}>家族スケジュール</Text>
@@ -307,7 +301,7 @@ export function CalendarScreen({
           </View>
         ) : null}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -354,6 +348,8 @@ const styles = StyleSheet.create({
   content: {
     gap: 18,
     paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   header: {
     alignItems: 'flex-start',

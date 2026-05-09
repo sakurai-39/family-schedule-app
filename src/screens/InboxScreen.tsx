@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { CalendarItem, TITLE_MAX_LENGTH } from '../types/CalendarItem';
@@ -26,7 +26,6 @@ type InboxScreenProps = {
 };
 
 export function InboxScreen({ db, user, onBack, onOpenItem }: InboxScreenProps) {
-  const insets = useSafeAreaInsets();
   const householdId = user.householdId;
   const { items, isLoading, errorMessage } = useInboxItems(db, householdId);
   const [title, setTitle] = useState('');
@@ -65,82 +64,78 @@ export function InboxScreen({ db, user, onBack, onOpenItem }: InboxScreenProps) 
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
-        ]}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flexFill}
       >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>あとで整理する場所</Text>
-            <Text style={styles.title}>とりあえずメモ</Text>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.eyebrow}>あとで整理する場所</Text>
+              <Text style={styles.title}>とりあえずメモ</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
+              <Text style={styles.headerButtonText}>戻る</Text>
+            </Pressable>
           </View>
-          <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>戻る</Text>
-          </Pressable>
-        </View>
 
-        <View style={styles.inputArea}>
-          <Text style={styles.label}>メモ</Text>
-          <TextInput
-            maxLength={TITLE_MAX_LENGTH}
-            multiline
-            onChangeText={handleChangeTitle}
-            placeholder="例: 週末に保育園へ提出する書類"
-            placeholderTextColor="#8f9791"
-            style={styles.input}
-            value={title}
-          />
-          <Text style={styles.counter}>
-            {trimmedTitle.length}/{TITLE_MAX_LENGTH}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!canSave}
-            onPress={handleCreate}
-            style={[styles.primaryButton, !canSave && styles.disabledButton]}
-          >
-            <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : 'メモを追加'}</Text>
-          </Pressable>
-        </View>
-
-        {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>未整理のメモ</Text>
-          <Text style={styles.countText}>{items.length}件</Text>
-        </View>
-
-        {isLoading ? (
-          <View style={styles.loadingArea}>
-            <ActivityIndicator color="#205f4b" />
-            <Text style={styles.mutedText}>メモを読み込んでいます</Text>
-          </View>
-        ) : null}
-
-        {!isLoading && items.length === 0 ? (
-          <View style={styles.emptyArea}>
-            <Text style={styles.emptyTitle}>まだメモはありません</Text>
-            <Text style={styles.emptyText}>
-              思いついた予定やタスクを短く入れて、あとで整理できます。
+          <View style={styles.inputArea}>
+            <Text style={styles.label}>メモ</Text>
+            <TextInput
+              maxLength={TITLE_MAX_LENGTH}
+              multiline
+              onChangeText={handleChangeTitle}
+              placeholder="例: 週末に保育園へ提出する書類"
+              placeholderTextColor="#8f9791"
+              style={styles.input}
+              value={title}
+            />
+            <Text style={styles.counter}>
+              {trimmedTitle.length}/{TITLE_MAX_LENGTH}
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!canSave}
+              onPress={handleCreate}
+              style={[styles.primaryButton, !canSave && styles.disabledButton]}
+            >
+              <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : 'メモを追加'}</Text>
+            </Pressable>
           </View>
-        ) : null}
 
-        <View style={styles.itemList}>
-          {items.map((item) => (
-            <InboxItem item={item} key={item.itemId} onPress={onOpenItem} />
-          ))}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>未整理のメモ</Text>
+            <Text style={styles.countText}>{items.length}件</Text>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.loadingArea}>
+              <ActivityIndicator color="#205f4b" />
+              <Text style={styles.mutedText}>メモを読み込んでいます</Text>
+            </View>
+          ) : null}
+
+          {!isLoading && items.length === 0 ? (
+            <View style={styles.emptyArea}>
+              <Text style={styles.emptyTitle}>まだメモはありません</Text>
+              <Text style={styles.emptyText}>
+                思いついた予定やタスクを短く入れて、あとで整理できます。
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.itemList}>
+            {items.map((item) => (
+              <InboxItem item={item} key={item.itemId} onPress={onOpenItem} />
+            ))}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -149,9 +144,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7f7f2',
     flex: 1,
   },
+  flexFill: {
+    flex: 1,
+  },
   content: {
     gap: 18,
     paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   header: {
     alignItems: 'flex-start',
