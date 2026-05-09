@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import {
@@ -52,7 +52,6 @@ export function CalendarItemEditScreen({
   onDeleted,
   onSaved,
 }: CalendarItemEditScreenProps) {
-  const insets = useSafeAreaInsets();
   const householdId = user.householdId;
   const initialKind = useMemo(() => getInitialKind(item), [item]);
   const initialDate = useMemo(() => item.startAt ?? item.dueAt ?? new Date(), [item]);
@@ -150,102 +149,98 @@ export function CalendarItemEditScreen({
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
-        ]}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flexFill}
       >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>
-              {item.status === 'inbox' ? 'メモを予定にする' : '予定を編集'}
-            </Text>
-            <Text style={styles.title}>{item.status === 'inbox' ? '整理する' : '編集する'}</Text>
-          </View>
-          <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>戻る</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.formArea}>
-          <View style={styles.field}>
-            <Text style={styles.label}>種類</Text>
-            <ItemTypeSelector onChange={setKind} value={kind} />
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.eyebrow}>
+                {item.status === 'inbox' ? 'メモを予定にする' : '予定を編集'}
+              </Text>
+              <Text style={styles.title}>{item.status === 'inbox' ? '整理する' : '編集する'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
+              <Text style={styles.headerButtonText}>戻る</Text>
+            </Pressable>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>タイトル</Text>
-            <TextInput
-              maxLength={TITLE_MAX_LENGTH}
-              onChangeText={setTitle}
-              placeholder="例: 保育園面談"
-              placeholderTextColor="#8f9791"
-              style={styles.input}
-              value={title}
-            />
+          <View style={styles.formArea}>
+            <View style={styles.field}>
+              <Text style={styles.label}>種類</Text>
+              <ItemTypeSelector onChange={setKind} value={kind} />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>タイトル</Text>
+              <TextInput
+                maxLength={TITLE_MAX_LENGTH}
+                onChangeText={setTitle}
+                placeholder="例: 保育園面談"
+                placeholderTextColor="#8f9791"
+                style={styles.input}
+                value={title}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>担当</Text>
+              <AssigneeSelector onChange={setAssignee} options={assigneeOptions} value={assignee} />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>{kind === 'event' ? '予定日時' : '期限'}</Text>
+              <DateTimeInput
+                dateText={dateText}
+                disabled={kind === 'todo'}
+                onChangeDate={setDateText}
+                onChangeTime={setTimeText}
+                timeText={timeText}
+              />
+              {kind === 'todo' ? (
+                <Text style={styles.helperText}>日付を決めない「やること」として保存します。</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>メモ</Text>
+              <TextInput
+                maxLength={MEMO_MAX_LENGTH}
+                multiline
+                onChangeText={setMemo}
+                placeholder="必要なら詳細を追加"
+                placeholderTextColor="#8f9791"
+                style={[styles.input, styles.memoInput]}
+                textAlignVertical="top"
+                value={memo}
+              />
+            </View>
+
+            {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={!canSubmit}
+              onPress={handleSave}
+              style={[styles.primaryButton, !canSubmit && styles.disabledButton]}
+            >
+              <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : '保存'}</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSaving || isDeleting}
+              onPress={handleDelete}
+              style={styles.deleteButton}
+            >
+              <Text style={styles.deleteButtonText}>{isDeleting ? '削除中' : '削除'}</Text>
+            </Pressable>
           </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>担当</Text>
-            <AssigneeSelector onChange={setAssignee} options={assigneeOptions} value={assignee} />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>{kind === 'event' ? '予定日時' : '期限'}</Text>
-            <DateTimeInput
-              dateText={dateText}
-              disabled={kind === 'todo'}
-              onChangeDate={setDateText}
-              onChangeTime={setTimeText}
-              timeText={timeText}
-            />
-            {kind === 'todo' ? (
-              <Text style={styles.helperText}>日付を決めない「やること」として保存します。</Text>
-            ) : null}
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>メモ</Text>
-            <TextInput
-              maxLength={MEMO_MAX_LENGTH}
-              multiline
-              onChangeText={setMemo}
-              placeholder="必要なら詳細を追加"
-              placeholderTextColor="#8f9791"
-              style={[styles.input, styles.memoInput]}
-              textAlignVertical="top"
-              value={memo}
-            />
-          </View>
-
-          {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={!canSubmit}
-            onPress={handleSave}
-            style={[styles.primaryButton, !canSubmit && styles.disabledButton]}
-          >
-            <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : '保存'}</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={isSaving || isDeleting}
-            onPress={handleDelete}
-            style={styles.deleteButton}
-          >
-            <Text style={styles.deleteButtonText}>{isDeleting ? '削除中' : '削除'}</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -289,9 +284,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7f7f2',
     flex: 1,
   },
+  flexFill: {
+    flex: 1,
+  },
   content: {
     gap: 18,
     paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   header: {
     alignItems: 'flex-start',

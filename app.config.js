@@ -33,7 +33,7 @@ export default ({ config }) => ({
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#ffffff',
     },
-    edgeToEdgeEnabled: true,
+    edgeToEdgeEnabled: false,
     predictiveBackGestureEnabled: false,
     package: 'com.ryou.familyscheduleapp',
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
