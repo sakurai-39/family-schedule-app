@@ -1,4 +1,7 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { formatDateInput, formatTimeInput, parseDateTimeOrFallback } from '../utils/dateTimeFormat';
 
 type DateTimeInputProps = {
   dateText: string;
@@ -15,32 +18,61 @@ export function DateTimeInput({
   onChangeDate,
   onChangeTime,
 }: DateTimeInputProps) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const pickerValue = parseDateTimeOrFallback(dateText, timeText, new Date());
+
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (event.type === 'set' && selectedDate) {
+      onChangeDate(formatDateInput(selectedDate));
+    }
+  };
+
+  const handleTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowTimePicker(false);
+    if (event.type === 'set' && selectedDate) {
+      onChangeTime(formatTimeInput(selectedDate));
+    }
+  };
+
   return (
     <View style={[styles.container, disabled && styles.disabledContainer]}>
       <View style={styles.field}>
         <Text style={styles.label}>日付</Text>
-        <TextInput
-          editable={!disabled}
-          keyboardType="numbers-and-punctuation"
-          onChangeText={onChangeDate}
-          placeholder="2026-05-08"
-          placeholderTextColor="#8f9791"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="日付を選ぶ"
+          disabled={disabled}
+          onPress={() => setShowDatePicker(true)}
           style={[styles.input, disabled && styles.disabledInput]}
-          value={dateText}
-        />
+        >
+          <Text style={[styles.value, !dateText && styles.placeholder]}>
+            {dateText || '日付を選ぶ'}
+          </Text>
+        </Pressable>
       </View>
       <View style={styles.field}>
         <Text style={styles.label}>時刻</Text>
-        <TextInput
-          editable={!disabled}
-          keyboardType="numbers-and-punctuation"
-          onChangeText={onChangeTime}
-          placeholder="09:30"
-          placeholderTextColor="#8f9791"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="時刻を選ぶ"
+          disabled={disabled}
+          onPress={() => setShowTimePicker(true)}
           style={[styles.input, disabled && styles.disabledInput]}
-          value={timeText}
-        />
+        >
+          <Text style={[styles.value, !timeText && styles.placeholder]}>
+            {timeText || '時刻を選ぶ'}
+          </Text>
+        </Pressable>
       </View>
+      {showDatePicker ? (
+        <DateTimePicker mode="date" value={pickerValue} onChange={handleDateChange} />
+      ) : null}
+      {showTimePicker ? (
+        <DateTimePicker mode="time" value={pickerValue} is24Hour onChange={handleTimeChange} />
+      ) : null}
     </View>
   );
 }
@@ -67,12 +99,18 @@ const styles = StyleSheet.create({
     borderColor: '#cfd6d1',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#202124',
-    fontSize: 16,
+    justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 12,
   },
   disabledInput: {
     backgroundColor: '#edf0ed',
+  },
+  value: {
+    color: '#202124',
+    fontSize: 16,
+  },
+  placeholder: {
+    color: '#8f9791',
   },
 });
