@@ -25,6 +25,7 @@ type CalendarScreenProps = {
   onOpenInvite: () => void;
   onOpenInbox: () => void;
   onOpenItem: (item: CalendarItem) => void;
+  onCreateEventForDate: (date: Date) => void;
 };
 
 type CalendarTab = 'today' | 'todo';
@@ -38,6 +39,7 @@ export function CalendarScreen({
   onOpenInvite,
   onOpenInbox,
   onOpenItem,
+  onCreateEventForDate,
 }: CalendarScreenProps) {
   const householdId = user.householdId;
   const today = useMemo(() => new Date(), []);
@@ -191,6 +193,14 @@ export function CalendarScreen({
             );
           })}
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onCreateEventForDate(selectedDate)}
+          style={styles.addEventButton}
+        >
+          <Text style={styles.addEventButtonText}>+ この日に予定を追加</Text>
+        </Pressable>
 
         <View style={styles.tabRow}>
           <Pressable
@@ -472,6 +482,19 @@ const styles = StyleSheet.create({
   },
   selectedItemDot: {
     backgroundColor: '#ffffff',
+  },
+  addEventButton: {
+    alignItems: 'center',
+    backgroundColor: '#205f4b',
+    borderRadius: 8,
+    minHeight: 46,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  addEventButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
   },
   tabRow: {
     backgroundColor: '#e7ece8',

@@ -23,6 +23,7 @@ import { AssigneeOption, AssigneeSelector } from '../components/AssigneeSelector
 import { DateTimeInput } from '../components/DateTimeInput';
 import { ItemTypeSelector } from '../components/ItemTypeSelector';
 import {
+  createScheduledItem,
   deleteCalendarItem,
   getHousehold,
   promoteInboxToScheduled,
@@ -37,28 +38,38 @@ import { formatDateInput, formatTimeInput } from '../utils/dateTimeFormat';
 
 type CalendarItemEditScreenProps = {
   db: Firestore;
-  item: CalendarItem;
   user: User;
   onBack: () => void;
-  onDeleted: () => void;
   onSaved: () => void;
-};
+} & (
+  | { mode: 'edit'; item: CalendarItem; onDeleted: () => void }
+  | { mode: 'create'; presetDate: Date }
+);
 
-export function CalendarItemEditScreen({
-  db,
-  item,
-  user,
-  onBack,
-  onDeleted,
-  onSaved,
-}: CalendarItemEditScreenProps) {
+export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
+  const { db, user, onBack, onSaved, mode } = props;
   const householdId = user.householdId;
-  const initialKind = useMemo(() => getInitialKind(item), [item]);
-  const initialDate = useMemo(() => item.startAt ?? item.dueAt ?? new Date(), [item]);
+
+  const initialKind = useMemo<ScheduleDraftKind>(
+    () => (mode === 'edit' ? getInitialKind(props.item) : 'event'),
+    [mode, props]
+  );
+  const initialDate = useMemo(
+    () =>
+      mode === 'edit'
+        ? (props.item.startAt ?? props.item.dueAt ?? new Date())
+        : applyDefaultTime(props.presetDate),
+    [mode, props]
+  );
+  const initialTitle = mode === 'edit' ? props.item.title : '';
+  const initialMemo = mode === 'edit' ? props.item.memo : '';
+  const initialAssignee: AssigneeValue | null =
+    mode === 'edit' ? (props.item.assignee ?? user.userId) : user.userId;
+
   const [kind, setKind] = useState<ScheduleDraftKind>(initialKind);
-  const [title, setTitle] = useState(item.title);
-  const [memo, setMemo] = useState(item.memo);
-  const [assignee, setAssignee] = useState<AssigneeValue | null>(item.assignee ?? user.userId);
+  const [title, setTitle] = useState(initialTitle);
+  const [memo, setMemo] = useState(initialMemo);
+  const [assignee, setAssignee] = useState<AssigneeValue | null>(initialAssignee);
   const [dateText, setDateText] = useState(formatDateInput(initialDate));
   const [timeText, setTimeText] = useState(formatTimeInput(initialDate));
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>(() =>
@@ -115,7 +126,11 @@ export function CalendarItemEditScreen({
     setIsSaving(true);
     setActionError(null);
     try {
-      await saveScheduledDraft(db, householdId, item, result);
+      if (mode === 'edit') {
+        await saveExistingItem(db, householdId, props.item, result);
+      } else {
+        await createScheduledItem(db, householdId, result.draft, user.userId);
+      }
       onSaved();
     } catch {
       setActionError('保存に失敗しました。時間をおいてもう一度お試しください。');
@@ -125,7 +140,7 @@ export function CalendarItemEditScreen({
   };
 
   const handleDelete = () => {
-    if (!householdId || isDeleting || isSaving) return;
+    if (mode !== 'edit' || !householdId || isDeleting || isSaving) return;
 
     Alert.alert('削除しますか？', 'このメモや予定を削除します。', [
       { text: 'キャンセル', style: 'cancel' },
@@ -136,8 +151,8 @@ export function CalendarItemEditScreen({
           setIsDeleting(true);
           setActionError(null);
           try {
-            await deleteCalendarItem(db, householdId, item.itemId);
-            onDeleted();
+            await deleteCalendarItem(db, householdId, props.item.itemId);
+            props.onDeleted();
           } catch {
             setActionError('削除に失敗しました。時間をおいてもう一度お試しください。');
           } finally {
@@ -157,10 +172,8 @@ export function CalendarItemEditScreen({
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <View>
-              <Text style={styles.eyebrow}>
-                {item.status === 'inbox' ? 'メモを予定にする' : '予定を編集'}
-              </Text>
-              <Text style={styles.title}>{item.status === 'inbox' ? '整理する' : '編集する'}</Text>
+              <Text style={styles.eyebrow}>{getEyebrowText(props)}</Text>
+              <Text style={styles.title}>{getTitleText(props)}</Text>
             </View>
             <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
               <Text style={styles.headerButtonText}>戻る</Text>
@@ -229,14 +242,16 @@ export function CalendarItemEditScreen({
               <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : '保存'}</Text>
             </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSaving || isDeleting}
-              onPress={handleDelete}
-              style={styles.deleteButton}
-            >
-              <Text style={styles.deleteButtonText}>{isDeleting ? '削除中' : '削除'}</Text>
-            </Pressable>
+            {mode === 'edit' ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSaving || isDeleting}
+                onPress={handleDelete}
+                style={styles.deleteButton}
+              >
+                <Text style={styles.deleteButtonText}>{isDeleting ? '削除中' : '削除'}</Text>
+              </Pressable>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -244,7 +259,7 @@ export function CalendarItemEditScreen({
   );
 }
 
-async function saveScheduledDraft(
+async function saveExistingItem(
   db: Firestore,
   householdId: string,
   item: CalendarItem,
@@ -256,6 +271,22 @@ async function saveScheduledDraft(
   }
 
   await updateScheduledItem(db, householdId, item.itemId, result.draft);
+}
+
+function getEyebrowText(props: CalendarItemEditScreenProps): string {
+  if (props.mode === 'create') return '新しい予定を追加';
+  return props.item.status === 'inbox' ? 'メモを予定にする' : '予定を編集';
+}
+
+function getTitleText(props: CalendarItemEditScreenProps): string {
+  if (props.mode === 'create') return '追加する';
+  return props.item.status === 'inbox' ? '整理する' : '編集する';
+}
+
+function applyDefaultTime(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(12, 0, 0, 0);
+  return result;
 }
 
 function buildAssigneeOptions(user: User, members: string[]): AssigneeOption[] {
