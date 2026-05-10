@@ -50,7 +50,7 @@ describe('todo summary notification quality checks', () => {
     expect(plan).toEqual({
       count: 3,
       title: '家族スケジュール',
-      body: 'やることリストが3件あります',
+      body: '期限なしタスクが3件あります',
     });
   });
 

@@ -1,7 +1,7 @@
 import { AssigneeValue, ScheduledItemDraft } from '../types/CalendarItem';
 import { sanitizeText, validateMemo, validateTitle } from './validation';
 
-export type ScheduleDraftKind = 'event' | 'task' | 'todo';
+export type ScheduleDraftKind = 'event' | 'task';
 
 export type ScheduleDraftForm = {
   kind: ScheduleDraftKind;
@@ -10,6 +10,9 @@ export type ScheduleDraftForm = {
   assignee: AssigneeValue | null;
   dateText: string;
   timeText: string;
+  // For 'task' kind: when false, the task is saved without a due date.
+  // Always treated as true for 'event' kind (events require a date).
+  hasDueDate: boolean;
 };
 
 export type ScheduleDraftResult =
@@ -82,7 +85,7 @@ export function buildScheduledItemDraft(form: ScheduleDraftForm): ScheduleDraftR
     return { ok: false, reason: '担当者を選んでください' };
   }
 
-  if (form.kind === 'todo') {
+  if (form.kind === 'task' && !form.hasDueDate) {
     return {
       ok: true,
       draft: {

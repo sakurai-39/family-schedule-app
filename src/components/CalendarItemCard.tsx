@@ -19,7 +19,7 @@ export function CalendarItemCard({
   onPress,
   isUpdating = false,
 }: CalendarItemCardProps) {
-  const itemKindLabel = item.type === 'event' ? '予定' : item.dueAt ? 'タスク' : 'やること';
+  const itemKindLabel = item.type === 'event' ? '予定' : 'タスク';
   const timeLabel = formatItemTime(item);
 
   return (

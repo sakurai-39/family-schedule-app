@@ -54,6 +54,10 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
     () => (mode === 'edit' ? getInitialKind(props.item) : 'event'),
     [mode, props]
   );
+  const initialHasDueDate = useMemo(
+    () => (mode === 'edit' ? getInitialHasDueDate(props.item) : true),
+    [mode, props]
+  );
   const initialDate = useMemo(
     () =>
       mode === 'edit'
@@ -67,6 +71,7 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
     mode === 'edit' ? (props.item.assignee ?? user.userId) : user.userId;
 
   const [kind, setKind] = useState<ScheduleDraftKind>(initialKind);
+  const [hasDueDate, setHasDueDate] = useState(initialHasDueDate);
   const [title, setTitle] = useState(initialTitle);
   const [memo, setMemo] = useState(initialMemo);
   const [assignee, setAssignee] = useState<AssigneeValue | null>(initialAssignee);
@@ -116,6 +121,7 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
       assignee,
       dateText,
       timeText,
+      hasDueDate: kind === 'event' ? true : hasDueDate,
     });
 
     if (!result.ok) {
@@ -205,16 +211,31 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
 
             <View style={styles.field}>
               <Text style={styles.label}>{kind === 'event' ? '予定日時' : '期限'}</Text>
-              <DateTimeInput
-                dateText={dateText}
-                disabled={kind === 'todo'}
-                onChangeDate={setDateText}
-                onChangeTime={setTimeText}
-                timeText={timeText}
-              />
-              {kind === 'todo' ? (
-                <Text style={styles.helperText}>日付を決めない「やること」として保存します。</Text>
+              {kind === 'task' ? (
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: !hasDueDate }}
+                  onPress={() => setHasDueDate((prev) => !prev)}
+                  style={styles.toggleRow}
+                >
+                  <View style={[styles.checkbox, !hasDueDate && styles.checkboxChecked]}>
+                    {!hasDueDate ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                  </View>
+                  <Text style={styles.toggleLabel}>期限を設定しない（いつかやるタスク）</Text>
+                </Pressable>
               ) : null}
+              {kind === 'event' || hasDueDate ? (
+                <DateTimeInput
+                  dateText={dateText}
+                  onChangeDate={setDateText}
+                  onChangeTime={setTimeText}
+                  timeText={timeText}
+                />
+              ) : (
+                <Text style={styles.helperText}>
+                  期限を設定せず保存します。あとから期限を追加することもできます。
+                </Text>
+              )}
             </View>
 
             <View style={styles.field}>
@@ -306,8 +327,12 @@ function buildAssigneeOptions(user: User, members: string[]): AssigneeOption[] {
 
 function getInitialKind(item: CalendarItem): ScheduleDraftKind {
   if (item.type === 'event') return 'event';
-  if (item.dueAt) return 'task';
-  return 'todo';
+  return 'task';
+}
+
+function getInitialHasDueDate(item: CalendarItem): boolean {
+  if (item.type === 'event') return true;
+  return item.dueAt !== null;
 }
 
 const styles = StyleSheet.create({
@@ -390,6 +415,38 @@ const styles = StyleSheet.create({
     color: '#68706b',
     fontSize: 13,
     lineHeight: 18,
+  },
+  toggleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#cfd6d1',
+    borderRadius: 5,
+    borderWidth: 1.5,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  checkboxChecked: {
+    backgroundColor: '#205f4b',
+    borderColor: '#205f4b',
+  },
+  checkboxMark: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 16,
+  },
+  toggleLabel: {
+    color: '#202124',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
   errorText: {
     color: '#b42318',
