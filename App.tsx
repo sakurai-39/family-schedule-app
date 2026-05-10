@@ -86,12 +86,7 @@ function AppContent() {
     <>
       {user ? (
         activeScreen.name === 'invite' ? (
-          <InviteScreen
-            db={db}
-            onBack={() => setActiveScreen({ name: 'calendar' })}
-            onSignOut={signOut}
-            user={user}
-          />
+          <InviteScreen db={db} onBack={() => setActiveScreen({ name: 'settings' })} user={user} />
         ) : activeScreen.name === 'inbox' ? (
           <InboxScreen
             db={db}
@@ -126,6 +121,7 @@ function AppContent() {
           <SettingsScreen
             db={db}
             onBack={() => setActiveScreen({ name: 'calendar' })}
+            onOpenInvite={() => setActiveScreen({ name: 'invite' })}
             onSignOut={signOut}
             onUserUpdated={refreshUser}
             user={user}
@@ -137,7 +133,6 @@ function AppContent() {
               setActiveScreen({ name: 'create-event', presetDate: date })
             }
             onOpenInbox={() => setActiveScreen({ name: 'inbox' })}
-            onOpenInvite={() => setActiveScreen({ name: 'invite' })}
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             onOpenSettings={() => setActiveScreen({ name: 'settings' })}
             user={user}
