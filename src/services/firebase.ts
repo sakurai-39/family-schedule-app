@@ -1,6 +1,15 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { Auth, getAuth, initializeAuth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// `getReactNativePersistence` is exported at runtime on React Native but not in
+// firebase/auth's default `.d.ts` (the RN-specific subpath is provided through
+// metro's `react-native` package field). Use a typed `require` to bypass the
+// missing type without losing type safety on the rest of firebase/auth.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { getReactNativePersistence } = require('firebase/auth') as {
+  getReactNativePersistence: (storage: unknown) => unknown;
+};
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -17,6 +26,17 @@ if (!firebaseConfig.apiKey) {
 
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const auth: Auth = getAuth(app);
+function createAuth(firebaseApp: FirebaseApp): Auth {
+  try {
+    return initializeAuth(firebaseApp, {
+      persistence: getReactNativePersistence(AsyncStorage) as never,
+    });
+  } catch {
+    // Auth was already initialized (e.g. on Fast Refresh or in tests).
+    return getAuth(firebaseApp);
+  }
+}
+
+export const auth: Auth = createAuth(app);
 export const db: Firestore = getFirestore(app);
 export default app;

@@ -8,6 +8,16 @@ jest.mock('firebase/app', () => ({
 
 jest.mock('firebase/auth', () => ({
   getAuth: jest.fn(() => ({ name: 'auth-mock' })),
+  getReactNativePersistence: jest.fn(() => ({ type: 'react-native-persistence' })),
+  initializeAuth: jest.fn(() => ({ name: 'auth-mock' })),
+}));
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: jest.fn(),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+  },
 }));
 
 jest.mock('firebase/firestore', () => ({

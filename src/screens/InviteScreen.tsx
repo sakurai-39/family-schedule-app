@@ -9,11 +9,10 @@ import { generateInviteCode } from '../services/pairing';
 type InviteScreenProps = {
   db: Firestore;
   user: User;
-  onSignOut: () => Promise<void> | void;
-  onBack?: () => void;
+  onBack: () => void;
 };
 
-export function InviteScreen({ db, user, onSignOut, onBack }: InviteScreenProps) {
+export function InviteScreen({ db, user, onBack }: InviteScreenProps) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -119,15 +118,9 @@ export function InviteScreen({ db, user, onSignOut, onBack }: InviteScreenProps)
           <Text style={styles.secondaryButtonText}>共有</Text>
         </Pressable>
 
-        <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.textButton}>
-          <Text style={styles.textButtonText}>サインアウト</Text>
+        <Pressable accessibilityRole="button" onPress={onBack} style={styles.textButton}>
+          <Text style={styles.textButtonText}>戻る</Text>
         </Pressable>
-
-        {onBack ? (
-          <Pressable accessibilityRole="button" onPress={onBack} style={styles.textButton}>
-            <Text style={styles.textButtonText}>カレンダーへ戻る</Text>
-          </Pressable>
-        ) : null}
       </View>
     </SafeAreaView>
   );

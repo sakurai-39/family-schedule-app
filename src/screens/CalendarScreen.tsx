@@ -22,7 +22,6 @@ type CalendarScreenProps = {
   db: Firestore;
   user: User;
   onOpenSettings: () => void;
-  onOpenInvite: () => void;
   onOpenInbox: () => void;
   onOpenItem: (item: CalendarItem) => void;
   onCreateEventForDate: (date: Date) => void;
@@ -36,7 +35,6 @@ export function CalendarScreen({
   db,
   user,
   onOpenSettings,
-  onOpenInvite,
   onOpenInbox,
   onOpenItem,
   onCreateEventForDate,
@@ -60,6 +58,15 @@ export function CalendarScreen({
   });
 
   const monthGrid = useMemo(() => buildMonthGrid(visibleMonth, today), [today, visibleMonth]);
+  const visibleMonthGrid = useMemo(() => {
+    let lastCurrentMonthIndex = 0;
+    for (let i = 0; i < monthGrid.length; i++) {
+      const cell = monthGrid[i];
+      if (cell?.isCurrentMonth) lastCurrentMonthIndex = i;
+    }
+    const weeksNeeded = Math.max(5, Math.ceil((lastCurrentMonthIndex + 1) / 7));
+    return monthGrid.slice(0, weeksNeeded * 7);
+  }, [monthGrid]);
   const itemDateKeys = useMemo(() => {
     return new Set(
       items
@@ -119,13 +126,6 @@ export function CalendarScreen({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={onOpenInvite}
-              style={styles.headerButton}
-            >
-              <Text style={styles.headerButtonText}>招待</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
               onPress={onOpenSettings}
               style={styles.headerButton}
             >
@@ -161,7 +161,7 @@ export function CalendarScreen({
         </View>
 
         <View style={styles.monthGrid}>
-          {monthGrid.map((day) => {
+          {visibleMonthGrid.map((day) => {
             const isSelected = day.dateKey === toLocalDateKey(selectedDate);
             const hasItem = itemDateKeys.has(day.dateKey);
 
@@ -186,9 +186,13 @@ export function CalendarScreen({
                 >
                   {day.dayOfMonth}
                 </Text>
-                {hasItem ? (
-                  <View style={[styles.itemDot, isSelected && styles.selectedItemDot]} />
-                ) : null}
+                <View
+                  style={[
+                    styles.itemDot,
+                    !hasItem && styles.itemDotHidden,
+                    isSelected && hasItem && styles.selectedItemDot,
+                  ]}
+                />
               </Pressable>
             );
           })}
@@ -446,11 +450,12 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     alignItems: 'center',
-    aspectRatio: 1,
+    aspectRatio: 1.15,
     borderColor: '#edf0ed',
     borderRightWidth: 1,
     borderTopWidth: 1,
     justifyContent: 'center',
+    paddingVertical: 6,
     width: `${100 / 7}%`,
   },
   otherMonthCell: {
@@ -479,6 +484,9 @@ const styles = StyleSheet.create({
     height: 6,
     marginTop: 4,
     width: 6,
+  },
+  itemDotHidden: {
+    backgroundColor: 'transparent',
   },
   selectedItemDot: {
     backgroundColor: '#ffffff',

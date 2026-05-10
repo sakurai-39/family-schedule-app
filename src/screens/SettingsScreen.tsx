@@ -21,6 +21,7 @@ type SettingsScreenProps = {
   onBack: () => void;
   onSignOut: () => Promise<void> | void;
   onUserUpdated: () => Promise<void> | void;
+  onOpenInvite: () => void;
 };
 
 export function SettingsScreen({
@@ -29,6 +30,7 @@ export function SettingsScreen({
   onBack,
   onSignOut,
   onUserUpdated,
+  onOpenInvite,
 }: SettingsScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user.displayName);
@@ -134,6 +136,20 @@ export function SettingsScreen({
             )}
 
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>家族に招待</Text>
+            <Text style={styles.helpText}>
+              招待コードを発行して、家族メンバーをこのアプリに招待します。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onOpenInvite}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>招待コードを発行する</Text>
+            </Pressable>
           </View>
 
           <View style={styles.section}>
