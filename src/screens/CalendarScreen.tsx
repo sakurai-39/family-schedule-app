@@ -21,7 +21,7 @@ import { updateCalendarItem } from '../services/firestore';
 type CalendarScreenProps = {
   db: Firestore;
   user: User;
-  onSignOut: () => Promise<void> | void;
+  onOpenSettings: () => void;
   onOpenInvite: () => void;
   onOpenInbox: () => void;
   onOpenItem: (item: CalendarItem) => void;
@@ -34,7 +34,7 @@ const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
 export function CalendarScreen({
   db,
   user,
-  onSignOut,
+  onOpenSettings,
   onOpenInvite,
   onOpenInbox,
   onOpenItem,
@@ -122,8 +122,12 @@ export function CalendarScreen({
             >
               <Text style={styles.headerButtonText}>招待</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>退出</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onOpenSettings}
+              style={styles.headerButton}
+            >
+              <Text style={styles.headerButtonText}>設定</Text>
             </Pressable>
           </View>
         </View>

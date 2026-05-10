@@ -10,6 +10,7 @@ import { InviteScreen } from './src/screens/InviteScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { InboxScreen } from './src/screens/InboxScreen';
 import { CalendarItemEditScreen } from './src/screens/CalendarItemEditScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { CalendarItem } from './src/types/CalendarItem';
 import { configureForegroundNotificationHandling } from './src/services/notifications';
 
@@ -23,7 +24,8 @@ type ActiveScreen =
   | { name: 'calendar' }
   | { name: 'invite' }
   | { name: 'inbox' }
-  | { name: 'edit'; item: CalendarItem };
+  | { name: 'edit'; item: CalendarItem }
+  | { name: 'settings' };
 
 export default function App() {
   return (
@@ -109,13 +111,21 @@ function AppContent() {
             onSaved={() => setActiveScreen({ name: 'calendar' })}
             user={user}
           />
+        ) : activeScreen.name === 'settings' ? (
+          <SettingsScreen
+            db={db}
+            onBack={() => setActiveScreen({ name: 'calendar' })}
+            onSignOut={signOut}
+            onUserUpdated={refreshUser}
+            user={user}
+          />
         ) : (
           <CalendarScreen
             db={db}
             onOpenInbox={() => setActiveScreen({ name: 'inbox' })}
             onOpenInvite={() => setActiveScreen({ name: 'invite' })}
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
-            onSignOut={signOut}
+            onOpenSettings={() => setActiveScreen({ name: 'settings' })}
             user={user}
           />
         )
