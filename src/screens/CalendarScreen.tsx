@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
@@ -90,6 +90,32 @@ export function CalendarScreen({
     setVisibleMonth(nextMonth);
   };
 
+  const monthPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, gestureState) =>
+        Math.abs(gestureState.dx) > 24 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2,
+      onPanResponderRelease: (_evt, gestureState) => {
+        if (gestureState.dx <= -50) {
+          handleMoveMonth(1);
+        } else if (gestureState.dx >= 50) {
+          handleMoveMonth(-1);
+        }
+      },
+    })
+  ).current;
+
+  const handleAddPress = () => {
+    Alert.alert(
+      '何を追加しますか？',
+      `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日に予定を追加するか、とりあえずメモを追加します。`,
+      [
+        { text: '予定を追加', onPress: () => onCreateEventForDate(selectedDate) },
+        { text: 'とりあえずメモ', onPress: () => onOpenInbox() },
+        { text: 'キャンセル', style: 'cancel' },
+      ]
+    );
+  };
+
   const handleSelectDate = (date: Date) => {
     setSelectedDate(date);
     setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
@@ -121,9 +147,6 @@ export function CalendarScreen({
             <Text style={styles.title}>{formatDateHeading(selectedDate)}</Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable accessibilityRole="button" onPress={onOpenInbox} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>メモ</Text>
-            </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={onOpenSettings}
@@ -160,7 +183,7 @@ export function CalendarScreen({
           ))}
         </View>
 
-        <View style={styles.monthGrid}>
+        <View style={styles.monthGrid} {...monthPanResponder.panHandlers}>
           {visibleMonthGrid.map((day) => {
             const isSelected = day.dateKey === toLocalDateKey(selectedDate);
             const hasItem = itemDateKeys.has(day.dateKey);
@@ -200,10 +223,11 @@ export function CalendarScreen({
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => onCreateEventForDate(selectedDate)}
-          style={styles.addEventButton}
+          accessibilityLabel="予定またはメモを追加"
+          onPress={handleAddPress}
+          style={styles.addButton}
         >
-          <Text style={styles.addEventButtonText}>+ この日に予定を追加</Text>
+          <Text style={styles.addButtonText}>+</Text>
         </Pressable>
 
         <View style={styles.tabRow}>
@@ -257,18 +281,7 @@ export function CalendarScreen({
           </Pressable>
         ) : null}
 
-        {!isLoading && open.length === 0 && completed.length === 0 ? (
-          <View style={styles.emptyArea}>
-            <Text style={styles.emptyTitle}>
-              {activeTab === 'today' ? 'この日の予定はありません' : 'やることはありません'}
-            </Text>
-            <Text style={styles.emptyText}>
-              {activeTab === 'today'
-                ? 'Plan 5で予定やタスクを追加できるようにします。'
-                : '期限なしタスクはPlan 5の入力画面で追加します。'}
-            </Text>
-          </View>
-        ) : null}
+        {null}
 
         <View style={styles.itemList}>
           {open.map((item) => {
@@ -491,18 +504,20 @@ const styles = StyleSheet.create({
   selectedItemDot: {
     backgroundColor: '#ffffff',
   },
-  addEventButton: {
+  addButton: {
     alignItems: 'center',
+    alignSelf: 'flex-end',
     backgroundColor: '#205f4b',
-    borderRadius: 8,
-    minHeight: 46,
+    borderRadius: 28,
+    height: 56,
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    width: 56,
   },
-  addEventButtonText: {
+  addButtonText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 28,
     fontWeight: '800',
+    lineHeight: 32,
   },
   tabRow: {
     backgroundColor: '#e7ece8',
