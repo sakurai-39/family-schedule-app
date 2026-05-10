@@ -1,11 +1,13 @@
-import { useMemo, useRef, useState } from 'react';
-import { Alert, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { CalendarItem, AssigneeValue } from '../types/CalendarItem';
 import { CalendarItemCard } from '../components/CalendarItemCard';
 import { AssigneeBadgeTone } from '../components/AssigneeBadge';
+import { BottomNavBar } from '../components/BottomNavBar';
 import { useCalendarItems } from '../hooks/useCalendarItems';
 import { useNotificationSync } from '../hooks/useNotificationSync';
 import {
@@ -27,9 +29,8 @@ type CalendarScreenProps = {
   onCreateEventForDate: (date: Date) => void;
 };
 
-type CalendarTab = 'today' | 'todo';
-
 const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
+const MAX_ITEMS_PER_CELL = 2;
 
 export function CalendarScreen({
   db,
@@ -39,13 +40,13 @@ export function CalendarScreen({
   onOpenItem,
   onCreateEventForDate,
 }: CalendarScreenProps) {
+  const insets = useSafeAreaInsets();
   const householdId = user.householdId;
   const today = useMemo(() => new Date(), []);
   const [visibleMonth, setVisibleMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [selectedDate, setSelectedDate] = useState(today);
-  const [activeTab, setActiveTab] = useState<CalendarTab>('today');
   const [showCompleted, setShowCompleted] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -67,13 +68,21 @@ export function CalendarScreen({
     const weeksNeeded = Math.max(5, Math.ceil((lastCurrentMonthIndex + 1) / 7));
     return monthGrid.slice(0, weeksNeeded * 7);
   }, [monthGrid]);
-  const itemDateKeys = useMemo(() => {
-    return new Set(
-      items
-        .map((item) => getDisplayDate(item))
-        .filter((date): date is Date => date !== null)
-        .map((date) => toLocalDateKey(date))
-    );
+
+  const itemsByDateKey = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
+    for (const item of items) {
+      const date = getDisplayDate(item);
+      if (!date) continue;
+      const key = toLocalDateKey(date);
+      const list = map.get(key);
+      if (list) {
+        list.push(item);
+      } else {
+        map.set(key, [item]);
+      }
+    }
+    return map;
   }, [items]);
 
   const selectedItems = useMemo(() => getItemsForDate(items, selectedDate), [items, selectedDate]);
@@ -82,44 +91,33 @@ export function CalendarScreen({
     () => undatedTasks.filter((item) => !item.isCompleted).length,
     [undatedTasks]
   );
-  const visibleItems = activeTab === 'today' ? selectedItems : undatedTasks;
-  const { open, completed } = useMemo(() => splitCompletedItems(visibleItems), [visibleItems]);
+  const { open, completed } = useMemo(() => splitCompletedItems(selectedItems), [selectedItems]);
 
   const handleMoveMonth = (amount: number) => {
     const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + amount, 1);
     setVisibleMonth(nextMonth);
   };
 
-  const monthPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_evt, gestureState) =>
-        Math.abs(gestureState.dx) > 24 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2,
-      onPanResponderRelease: (_evt, gestureState) => {
-        if (gestureState.dx <= -50) {
-          handleMoveMonth(1);
-        } else if (gestureState.dx >= 50) {
-          handleMoveMonth(-1);
-        }
-      },
-    })
-  ).current;
-
-  const handleAddPress = () => {
-    Alert.alert(
-      '何を追加しますか？',
-      `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日に予定を追加するか、とりあえずメモを追加します。`,
-      [
-        { text: '予定を追加', onPress: () => onCreateEventForDate(selectedDate) },
-        { text: 'とりあえずメモ', onPress: () => onOpenInbox() },
-        { text: 'キャンセル', style: 'cancel' },
-      ]
-    );
-  };
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-30, 30])
+        .failOffsetY([-20, 20])
+        .onEnd((event) => {
+          if (event.translationX <= -50) {
+            handleMoveMonth(1);
+          } else if (event.translationX >= 50) {
+            handleMoveMonth(-1);
+          }
+        }),
+    // handleMoveMonth depends on visibleMonth so re-create on month change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleMonth]
+  );
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(date);
     setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-    setActiveTab('today');
   };
 
   const handleToggleCompleted = async (item: CalendarItem) => {
@@ -138,25 +136,13 @@ export function CalendarScreen({
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>家族スケジュール</Text>
-            <Text style={styles.title}>{formatDateHeading(selectedDate)}</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onOpenSettings}
-              style={styles.headerButton}
-            >
-              <Text style={styles.headerButtonText}>設定</Text>
-            </Pressable>
-          </View>
-        </View>
+  const bottomNavReservedHeight = 96 + insets.bottom;
 
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: bottomNavReservedHeight }]}
+      >
         <View style={styles.monthHeader}>
           <Pressable
             accessibilityRole="button"
@@ -183,83 +169,62 @@ export function CalendarScreen({
           ))}
         </View>
 
-        <View style={styles.monthGrid} {...monthPanResponder.panHandlers}>
-          {visibleMonthGrid.map((day) => {
-            const isSelected = day.dateKey === toLocalDateKey(selectedDate);
-            const hasItem = itemDateKeys.has(day.dateKey);
+        <GestureDetector gesture={swipeGesture}>
+          <View style={styles.monthGrid}>
+            {visibleMonthGrid.map((day) => {
+              const isSelected = day.dateKey === toLocalDateKey(selectedDate);
+              const dayItems = itemsByDateKey.get(day.dateKey) ?? [];
+              const visibleItems = dayItems.slice(0, MAX_ITEMS_PER_CELL);
+              const overflowCount = dayItems.length - visibleItems.length;
 
-            return (
-              <Pressable
-                accessibilityRole="button"
-                key={day.dateKey}
-                onPress={() => handleSelectDate(day.date)}
-                style={[
-                  styles.dayCell,
-                  !day.isCurrentMonth && styles.otherMonthCell,
-                  day.isToday && styles.todayCell,
-                  isSelected && styles.selectedDayCell,
-                ]}
-              >
-                <Text
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  key={day.dateKey}
+                  onPress={() => handleSelectDate(day.date)}
                   style={[
-                    styles.dayText,
-                    !day.isCurrentMonth && styles.otherMonthText,
-                    isSelected && styles.selectedDayText,
+                    styles.dayCell,
+                    !day.isCurrentMonth && styles.otherMonthCell,
+                    day.isToday && styles.todayCell,
+                    isSelected && styles.selectedDayCell,
                   ]}
                 >
-                  {day.dayOfMonth}
-                </Text>
-                <View
-                  style={[
-                    styles.itemDot,
-                    !hasItem && styles.itemDotHidden,
-                    isSelected && hasItem && styles.selectedItemDot,
-                  ]}
-                />
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="予定またはメモを追加"
-          onPress={handleAddPress}
-          style={styles.addButton}
-        >
-          <Text style={styles.addButtonText}>+</Text>
-        </Pressable>
-
-        <View style={styles.tabRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setActiveTab('today')}
-            style={[styles.tabButton, activeTab === 'today' && styles.activeTabButton]}
-          >
-            <Text
-              style={[styles.tabButtonText, activeTab === 'today' && styles.activeTabButtonText]}
-            >
-              予定
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setActiveTab('todo')}
-            style={[styles.tabButton, activeTab === 'todo' && styles.activeTabButton]}
-          >
-            <Text
-              style={[styles.tabButtonText, activeTab === 'todo' && styles.activeTabButtonText]}
-            >
-              タスク
-            </Text>
-          </Pressable>
-        </View>
+                  <Text
+                    style={[
+                      styles.dayText,
+                      !day.isCurrentMonth && styles.otherMonthText,
+                      isSelected && styles.selectedDayText,
+                    ]}
+                  >
+                    {day.dayOfMonth}
+                  </Text>
+                  <View style={styles.cellItemsArea}>
+                    {visibleItems.map((item) => (
+                      <Text
+                        key={item.itemId}
+                        numberOfLines={1}
+                        style={[styles.cellItemText, isSelected && styles.cellItemTextSelected]}
+                      >
+                        {item.title}
+                      </Text>
+                    ))}
+                    {overflowCount > 0 ? (
+                      <Text
+                        style={[styles.cellOverflowText, isSelected && styles.cellItemTextSelected]}
+                      >
+                        +{overflowCount}
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </GestureDetector>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {activeTab === 'today' ? formatListTitle(selectedDate) : '期限なしのタスク'}
-          </Text>
-          <Text style={styles.countText}>{visibleItems.length}件</Text>
+          <Text style={styles.sectionTitle}>{formatListTitle(selectedDate)}</Text>
+          <Text style={styles.countText}>{selectedItems.length}件</Text>
         </View>
 
         {isLoading ? <Text style={styles.mutedText}>予定を読み込んでいます。</Text> : null}
@@ -272,7 +237,7 @@ export function CalendarScreen({
         {openUndatedTaskCount > 0 ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => setActiveTab('todo')}
+            onPress={onOpenInbox}
             style={styles.todoSummaryBanner}
           >
             <Text style={styles.todoSummaryBannerText}>
@@ -280,8 +245,6 @@ export function CalendarScreen({
             </Text>
           </Pressable>
         ) : null}
-
-        {null}
 
         <View style={styles.itemList}>
           {open.map((item) => {
@@ -332,6 +295,14 @@ export function CalendarScreen({
           </View>
         ) : null}
       </ScrollView>
+
+      <BottomNavBar
+        bottomInset={insets.bottom}
+        onAddEvent={() => onCreateEventForDate(selectedDate)}
+        onAddInbox={onOpenInbox}
+        onOpenInbox={onOpenInbox}
+        onOpenSettings={onOpenSettings}
+      />
     </SafeAreaView>
   );
 }
@@ -363,10 +334,6 @@ function formatMonthTitle(date: Date): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
 }
 
-function formatDateHeading(date: Date): string {
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekLabels[date.getDay()]}`;
-}
-
 function formatListTitle(date: Date): string {
   return `${date.getMonth() + 1}月${date.getDate()}日の予定`;
 }
@@ -377,46 +344,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: 18,
-    paddingHorizontal: 20,
+    gap: 14,
+    paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 24,
-  },
-  header: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  eyebrow: {
-    color: '#68706b',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  title: {
-    color: '#202124',
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: 0,
-    marginTop: 4,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  headerButton: {
-    backgroundColor: '#ffffff',
-    borderColor: '#cfd6d1',
-    borderRadius: 7,
-    borderWidth: 1,
-    minHeight: 38,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  headerButtonText: {
-    color: '#205f4b',
-    fontSize: 13,
-    fontWeight: '800',
   },
   monthHeader: {
     alignItems: 'center',
@@ -427,19 +357,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 8,
-    height: 42,
+    height: 40,
     justifyContent: 'center',
-    width: 42,
+    width: 40,
   },
   monthButtonText: {
     color: '#202124',
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '600',
-    lineHeight: 34,
+    lineHeight: 30,
   },
   monthTitle: {
     color: '#202124',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
   },
   weekRow: {
@@ -462,13 +392,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dayCell: {
-    alignItems: 'center',
-    aspectRatio: 1.15,
+    alignItems: 'stretch',
     borderColor: '#edf0ed',
     borderRightWidth: 1,
     borderTopWidth: 1,
-    justifyContent: 'center',
-    paddingVertical: 6,
+    minHeight: 76,
+    paddingHorizontal: 3,
+    paddingVertical: 4,
     width: `${100 / 7}%`,
   },
   otherMonthCell: {
@@ -482,8 +412,9 @@ const styles = StyleSheet.create({
   },
   dayText: {
     color: '#202124',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
+    textAlign: 'center',
   },
   otherMonthText: {
     color: '#a2aaa5',
@@ -491,66 +422,39 @@ const styles = StyleSheet.create({
   selectedDayText: {
     color: '#ffffff',
   },
-  itemDot: {
-    backgroundColor: '#426b9f',
+  cellItemsArea: {
+    gap: 2,
+    marginTop: 2,
+  },
+  cellItemText: {
+    backgroundColor: '#dfe7e3',
     borderRadius: 3,
-    height: 6,
-    marginTop: 4,
-    width: 6,
+    color: '#1a3d30',
+    fontSize: 9,
+    fontWeight: '700',
+    overflow: 'hidden',
+    paddingHorizontal: 3,
+    paddingVertical: 1,
   },
-  itemDotHidden: {
-    backgroundColor: 'transparent',
-  },
-  selectedItemDot: {
+  cellItemTextSelected: {
     backgroundColor: '#ffffff',
-  },
-  addButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    backgroundColor: '#205f4b',
-    borderRadius: 28,
-    height: 56,
-    justifyContent: 'center',
-    width: 56,
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 32,
-  },
-  tabRow: {
-    backgroundColor: '#e7ece8',
-    borderRadius: 8,
-    flexDirection: 'row',
-    padding: 4,
-  },
-  tabButton: {
-    alignItems: 'center',
-    borderRadius: 6,
-    flex: 1,
-    minHeight: 42,
-    justifyContent: 'center',
-  },
-  activeTabButton: {
-    backgroundColor: '#ffffff',
-  },
-  tabButtonText: {
-    color: '#65706a',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  activeTabButtonText: {
     color: '#205f4b',
+  },
+  cellOverflowText: {
+    color: '#205f4b',
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'right',
   },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingTop: 4,
   },
   sectionTitle: {
     color: '#202124',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
   },
   countText: {
@@ -568,24 +472,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  emptyArea: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d8ded9',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 18,
-  },
-  emptyTitle: {
-    color: '#202124',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  emptyText: {
-    color: '#68706b',
-    fontSize: 14,
-    lineHeight: 20,
-  },
   itemList: {
     gap: 10,
   },
@@ -595,13 +481,13 @@ const styles = StyleSheet.create({
   completedToggle: {
     backgroundColor: '#edf0ed',
     borderRadius: 8,
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
   completedToggleText: {
     color: '#4d5751',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
   todoSummaryBanner: {
@@ -609,13 +495,13 @@ const styles = StyleSheet.create({
     borderColor: '#b7d2c4',
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 48,
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
   todoSummaryBannerText: {
     color: '#205f4b',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
 });
