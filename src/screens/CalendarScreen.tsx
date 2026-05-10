@@ -239,7 +239,7 @@ export function CalendarScreen({
             <Text
               style={[styles.tabButtonText, activeTab === 'today' && styles.activeTabButtonText]}
             >
-              今日
+              予定
             </Text>
           </Pressable>
           <Pressable
@@ -250,14 +250,14 @@ export function CalendarScreen({
             <Text
               style={[styles.tabButtonText, activeTab === 'todo' && styles.activeTabButtonText]}
             >
-              やること
+              タスク
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {activeTab === 'today' ? formatListTitle(selectedDate) : '期限なしのやること'}
+            {activeTab === 'today' ? formatListTitle(selectedDate) : '期限なしのタスク'}
           </Text>
           <Text style={styles.countText}>{visibleItems.length}件</Text>
         </View>
@@ -276,7 +276,7 @@ export function CalendarScreen({
             style={styles.todoSummaryBanner}
           >
             <Text style={styles.todoSummaryBannerText}>
-              やることリストが{openUndatedTaskCount}件あります
+              期限なしタスクが{openUndatedTaskCount}件あります
             </Text>
           </Pressable>
         ) : null}

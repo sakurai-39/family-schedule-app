@@ -8,8 +8,7 @@ type ItemTypeSelectorProps = {
 
 const options: { value: ScheduleDraftKind; label: string }[] = [
   { value: 'event', label: '予定' },
-  { value: 'task', label: '期限あり' },
-  { value: 'todo', label: 'やること' },
+  { value: 'task', label: 'タスク' },
 ];
 
 export function ItemTypeSelector({ value, onChange }: ItemTypeSelectorProps) {

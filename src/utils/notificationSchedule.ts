@@ -82,7 +82,7 @@ export function buildWeeklyTodoSummaryPlan(
   return {
     count,
     title: '家族スケジュール',
-    body: `やることリストが${count}件あります`,
+    body: `期限なしタスクが${count}件あります`,
   };
 }
 

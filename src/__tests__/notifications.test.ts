@@ -139,7 +139,7 @@ describe('notificationSchedule', () => {
     expect(plan).toEqual({
       count: 2,
       title: '家族スケジュール',
-      body: 'やることリストが2件あります',
+      body: '期限なしタスクが2件あります',
     });
   });
 
@@ -184,7 +184,7 @@ describe('syncLocalNotifications', () => {
     expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-item');
     expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-weekly');
     expect(api.setNotificationChannelAsync).toHaveBeenCalledWith(NOTIFICATION_CHANNEL_ID, {
-      name: '予定とやること',
+      name: '予定とタスク',
       importance: 5,
     });
     expect(api.scheduleNotificationAsync).toHaveBeenCalledTimes(3);

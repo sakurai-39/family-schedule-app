@@ -38,6 +38,7 @@ describe('inbox conversion draft quality checks', () => {
       assignee: 'both',
       dateText: '2026-05-10',
       timeText: '09:30',
+      hasDueDate: true,
     });
 
     expect(result).toEqual({
@@ -52,14 +53,15 @@ describe('inbox conversion draft quality checks', () => {
     });
   });
 
-  it('converts form input into an undated todo draft', () => {
+  it('converts form input into an undated task draft (no due date)', () => {
     const result = buildScheduledItemDraft({
-      kind: 'todo',
+      kind: 'task',
       title: '靴を買う',
       memo: '',
       assignee: 'whoever',
       dateText: '',
       timeText: '',
+      hasDueDate: false,
     });
 
     expect(result).toEqual({
@@ -82,6 +84,7 @@ describe('inbox conversion draft quality checks', () => {
       assignee: 'user-A',
       dateText: '2026-05-10',
       timeText: '09:30',
+      hasDueDate: true,
     });
 
     expect(result).toEqual({ ok: false, reason: 'タイトルを入力してください' });

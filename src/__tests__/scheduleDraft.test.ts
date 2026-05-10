@@ -23,6 +23,7 @@ describe('buildScheduledItemDraft', () => {
       assignee: 'both',
       dateText: '2026-05-08',
       timeText: '09:30',
+      hasDueDate: true,
     });
 
     expect(result).toEqual({
@@ -37,7 +38,7 @@ describe('buildScheduledItemDraft', () => {
     });
   });
 
-  it('builds a due task draft with a required dueAt', () => {
+  it('builds a dated task draft when task with hasDueDate=true', () => {
     const result = buildScheduledItemDraft({
       kind: 'task',
       title: '予防接種を予約',
@@ -45,6 +46,7 @@ describe('buildScheduledItemDraft', () => {
       assignee: 'user-A',
       dateText: '2026-05-09',
       timeText: '18:00',
+      hasDueDate: true,
     });
 
     expect(result).toEqual({
@@ -59,14 +61,15 @@ describe('buildScheduledItemDraft', () => {
     });
   });
 
-  it('builds an undated todo draft with dueAt null', () => {
+  it('builds an undated task draft when task with hasDueDate=false', () => {
     const result = buildScheduledItemDraft({
-      kind: 'todo',
+      kind: 'task',
       title: '靴を買う',
       memo: '',
       assignee: 'whoever',
       dateText: '',
       timeText: '',
+      hasDueDate: false,
     });
 
     expect(result).toEqual({
@@ -90,6 +93,7 @@ describe('buildScheduledItemDraft', () => {
         assignee: 'both',
         dateText: '2026-05-08',
         timeText: '09:30',
+        hasDueDate: true,
       })
     ).toEqual({ ok: false, reason: 'タイトルを入力してください' });
 
@@ -101,6 +105,7 @@ describe('buildScheduledItemDraft', () => {
         assignee: null,
         dateText: '2026-05-08',
         timeText: '09:30',
+        hasDueDate: true,
       })
     ).toEqual({ ok: false, reason: '担当者を選んでください' });
 
@@ -112,6 +117,7 @@ describe('buildScheduledItemDraft', () => {
         assignee: 'both',
         dateText: 'bad-date',
         timeText: '09:30',
+        hasDueDate: true,
       })
     ).toEqual({ ok: false, reason: '日付と時刻を正しく入力してください' });
   });

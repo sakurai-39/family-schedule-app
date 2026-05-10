@@ -1,5 +1,5 @@
 export const NOTIFICATION_CHANNEL_ID = 'family-schedule-reminders';
-export const NOTIFICATION_CHANNEL_NAME = '予定とやること';
+export const NOTIFICATION_CHANNEL_NAME = '予定とタスク';
 
 export const ITEM_PREVIOUS_DAY_REMINDER_HOUR = 21;
 export const ITEM_SAME_DAY_REMINDER_HOUR = 7;
