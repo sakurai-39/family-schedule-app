@@ -347,6 +347,21 @@ export async function updateScheduledItem(
   await updateDoc(doc(db, `households/${householdId}/calendar_items`, itemId), updates);
 }
 
+export async function createScheduledItem(
+  db: Firestore,
+  householdId: string,
+  draft: ScheduledItemDraft,
+  createdBy: string
+): Promise<string> {
+  const itemId = await createInboxItem(db, householdId, {
+    title: draft.title,
+    createdBy,
+    inputDurationMs: null,
+  });
+  await promoteInboxToScheduled(db, householdId, itemId, draft);
+  return itemId;
+}
+
 export async function updateCalendarItem(
   db: Firestore,
   householdId: string,

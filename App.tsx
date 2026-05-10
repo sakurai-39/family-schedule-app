@@ -25,6 +25,7 @@ type ActiveScreen =
   | { name: 'invite' }
   | { name: 'inbox' }
   | { name: 'edit'; item: CalendarItem }
+  | { name: 'create-event'; presetDate: Date }
   | { name: 'settings' };
 
 export default function App() {
@@ -100,6 +101,7 @@ function AppContent() {
           />
         ) : activeScreen.name === 'edit' ? (
           <CalendarItemEditScreen
+            mode="edit"
             db={db}
             item={activeScreen.item}
             onBack={() =>
@@ -108,6 +110,15 @@ function AppContent() {
               )
             }
             onDeleted={() => setActiveScreen({ name: 'calendar' })}
+            onSaved={() => setActiveScreen({ name: 'calendar' })}
+            user={user}
+          />
+        ) : activeScreen.name === 'create-event' ? (
+          <CalendarItemEditScreen
+            mode="create"
+            db={db}
+            presetDate={activeScreen.presetDate}
+            onBack={() => setActiveScreen({ name: 'calendar' })}
             onSaved={() => setActiveScreen({ name: 'calendar' })}
             user={user}
           />
@@ -122,6 +133,9 @@ function AppContent() {
         ) : (
           <CalendarScreen
             db={db}
+            onCreateEventForDate={(date) =>
+              setActiveScreen({ name: 'create-event', presetDate: date })
+            }
             onOpenInbox={() => setActiveScreen({ name: 'inbox' })}
             onOpenInvite={() => setActiveScreen({ name: 'invite' })}
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
