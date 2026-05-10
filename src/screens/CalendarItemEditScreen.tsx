@@ -19,7 +19,7 @@ import {
   MEMO_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../types/CalendarItem';
-import { AssigneeOption, AssigneeSelector } from '../components/AssigneeSelector';
+import { AssigneeSelector } from '../components/AssigneeSelector';
 import { DateTimeInput } from '../components/DateTimeInput';
 import { ItemTypeSelector } from '../components/ItemTypeSelector';
 import {
@@ -77,9 +77,7 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
   const [assignee, setAssignee] = useState<AssigneeValue | null>(initialAssignee);
   const [dateText, setDateText] = useState(formatDateInput(initialDate));
   const [timeText, setTimeText] = useState(formatTimeInput(initialDate));
-  const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>(() =>
-    buildAssigneeOptions(user, [])
-  );
+  const [partnerId, setPartnerId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -93,11 +91,12 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
       try {
         const household = await getHousehold(db, householdId);
         if (isMounted) {
-          setAssigneeOptions(buildAssigneeOptions(user, household?.members ?? []));
+          const otherMember = household?.members.find((memberId) => memberId !== user.userId);
+          setPartnerId(otherMember ?? null);
         }
       } catch {
         if (isMounted) {
-          setAssigneeOptions(buildAssigneeOptions(user, []));
+          setPartnerId(null);
         }
       }
     }
@@ -206,7 +205,14 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
 
             <View style={styles.field}>
               <Text style={styles.label}>担当</Text>
-              <AssigneeSelector onChange={setAssignee} options={assigneeOptions} value={assignee} />
+              <AssigneeSelector
+                onChange={setAssignee}
+                partnerId={partnerId}
+                partnerLabel="相手"
+                selfId={user.userId}
+                selfLabel={user.displayName || '自分'}
+                value={assignee}
+              />
             </View>
 
             <View style={styles.field}>
@@ -308,21 +314,6 @@ function applyDefaultTime(date: Date): Date {
   const result = new Date(date);
   result.setHours(12, 0, 0, 0);
   return result;
-}
-
-function buildAssigneeOptions(user: User, members: string[]): AssigneeOption[] {
-  const partnerId = members.find((memberId) => memberId !== user.userId);
-  const options: AssigneeOption[] = [
-    { value: user.userId, label: user.displayName || '自分' },
-    { value: 'both', label: '両方' },
-    { value: 'whoever', label: 'どちらか' },
-  ];
-
-  if (partnerId) {
-    options.splice(1, 0, { value: partnerId, label: '相手' });
-  }
-
-  return options;
 }
 
 function getInitialKind(item: CalendarItem): ScheduleDraftKind {
