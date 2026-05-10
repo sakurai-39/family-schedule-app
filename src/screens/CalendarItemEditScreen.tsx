@@ -151,7 +151,7 @@ export function CalendarItemEditScreen({
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flexFill}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
