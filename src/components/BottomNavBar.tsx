@@ -74,7 +74,7 @@ export function BottomNavBar({
         style={[
           styles.popupArea,
           {
-            bottom: bottomInset + 80,
+            bottom: bottomInset + 96,
             opacity: popupOpacity,
             transform: [{ translateY: popupTranslateY }],
           },
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   },
   popupArea: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 10,
     justifyContent: 'center',
     left: 0,
@@ -149,6 +149,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 999,
     minHeight: 44,
+    minWidth: 196,
     justifyContent: 'center',
     paddingHorizontal: 20,
   },

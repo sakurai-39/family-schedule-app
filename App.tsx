@@ -24,7 +24,7 @@ const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 type ActiveScreen =
   | { name: 'calendar' }
   | { name: 'invite' }
-  | { name: 'inbox' }
+  | { name: 'inbox'; mode: 'list' | 'compose' }
   | { name: 'edit'; item: CalendarItem }
   | { name: 'create-event'; presetDate: Date }
   | { name: 'settings' };
@@ -93,6 +93,7 @@ function AppContent() {
         ) : activeScreen.name === 'inbox' ? (
           <InboxScreen
             db={db}
+            mode={activeScreen.mode}
             onBack={() => setActiveScreen({ name: 'calendar' })}
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             user={user}
@@ -104,7 +105,9 @@ function AppContent() {
             item={activeScreen.item}
             onBack={() =>
               setActiveScreen(
-                activeScreen.item.status === 'inbox' ? { name: 'inbox' } : { name: 'calendar' }
+                activeScreen.item.status === 'inbox'
+                  ? { name: 'inbox', mode: 'list' }
+                  : { name: 'calendar' }
               )
             }
             onDeleted={() => setActiveScreen({ name: 'calendar' })}
@@ -135,7 +138,8 @@ function AppContent() {
             onCreateEventForDate={(date) =>
               setActiveScreen({ name: 'create-event', presetDate: date })
             }
-            onOpenInbox={() => setActiveScreen({ name: 'inbox' })}
+            onOpenInbox={() => setActiveScreen({ name: 'inbox', mode: 'list' })}
+            onOpenInboxComposer={() => setActiveScreen({ name: 'inbox', mode: 'compose' })}
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             onOpenSettings={() => setActiveScreen({ name: 'settings' })}
             user={user}

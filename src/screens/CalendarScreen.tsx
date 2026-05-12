@@ -25,6 +25,7 @@ type CalendarScreenProps = {
   user: User;
   onOpenSettings: () => void;
   onOpenInbox: () => void;
+  onOpenInboxComposer: () => void;
   onOpenItem: (item: CalendarItem) => void;
   onCreateEventForDate: (date: Date) => void;
 };
@@ -37,6 +38,7 @@ export function CalendarScreen({
   user,
   onOpenSettings,
   onOpenInbox,
+  onOpenInboxComposer,
   onOpenItem,
   onCreateEventForDate,
 }: CalendarScreenProps) {
@@ -299,7 +301,7 @@ export function CalendarScreen({
       <BottomNavBar
         bottomInset={insets.bottom}
         onAddEvent={() => onCreateEventForDate(selectedDate)}
-        onAddInbox={onOpenInbox}
+        onAddInbox={onOpenInboxComposer}
         onOpenInbox={onOpenInbox}
         onOpenSettings={onOpenSettings}
       />
