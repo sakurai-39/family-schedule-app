@@ -20,12 +20,13 @@ import { createInboxItem } from '../services/firestore';
 
 type InboxScreenProps = {
   db: Firestore;
+  mode: 'list' | 'compose';
   user: User;
   onBack: () => void;
   onOpenItem: (item: CalendarItem) => void;
 };
 
-export function InboxScreen({ db, user, onBack, onOpenItem }: InboxScreenProps) {
+export function InboxScreen({ db, mode, user, onBack, onOpenItem }: InboxScreenProps) {
   const householdId = user.householdId;
   const { items, isLoading, errorMessage } = useInboxItems(db, householdId);
   const [title, setTitle] = useState('');
@@ -80,29 +81,31 @@ export function InboxScreen({ db, user, onBack, onOpenItem }: InboxScreenProps) 
             </Pressable>
           </View>
 
-          <View style={styles.inputArea}>
-            <Text style={styles.label}>メモ</Text>
-            <TextInput
-              maxLength={TITLE_MAX_LENGTH}
-              multiline
-              onChangeText={handleChangeTitle}
-              placeholder="例: 週末に保育園へ提出する書類"
-              placeholderTextColor="#8f9791"
-              style={styles.input}
-              value={title}
-            />
-            <Text style={styles.counter}>
-              {trimmedTitle.length}/{TITLE_MAX_LENGTH}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!canSave}
-              onPress={handleCreate}
-              style={[styles.primaryButton, !canSave && styles.disabledButton]}
-            >
-              <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : 'メモを追加'}</Text>
-            </Pressable>
-          </View>
+          {mode === 'compose' ? (
+            <View style={styles.inputArea}>
+              <Text style={styles.label}>メモ</Text>
+              <TextInput
+                maxLength={TITLE_MAX_LENGTH}
+                multiline
+                onChangeText={handleChangeTitle}
+                placeholder="例: 週末に保育園へ提出する書類"
+                placeholderTextColor="#8f9791"
+                style={styles.input}
+                value={title}
+              />
+              <Text style={styles.counter}>
+                {trimmedTitle.length}/{TITLE_MAX_LENGTH}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={!canSave}
+                onPress={handleCreate}
+                style={[styles.primaryButton, !canSave && styles.disabledButton]}
+              >
+                <Text style={styles.primaryButtonText}>{isSaving ? '保存中' : 'メモを追加'}</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
