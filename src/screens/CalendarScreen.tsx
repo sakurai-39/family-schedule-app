@@ -26,6 +26,7 @@ type CalendarScreenProps = {
   onOpenSettings: () => void;
   onOpenInbox: () => void;
   onOpenInboxComposer: () => void;
+  onOpenUndatedTasks: () => void;
   onOpenItem: (item: CalendarItem) => void;
   onCreateEventForDate: (date: Date) => void;
 };
@@ -39,6 +40,7 @@ export function CalendarScreen({
   onOpenSettings,
   onOpenInbox,
   onOpenInboxComposer,
+  onOpenUndatedTasks,
   onOpenItem,
   onCreateEventForDate,
 }: CalendarScreenProps) {
@@ -239,7 +241,7 @@ export function CalendarScreen({
         {openUndatedTaskCount > 0 ? (
           <Pressable
             accessibilityRole="button"
-            onPress={onOpenInbox}
+            onPress={onOpenUndatedTasks}
             style={styles.todoSummaryBanner}
           >
             <Text style={styles.todoSummaryBannerText}>

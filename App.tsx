@@ -12,6 +12,7 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { InboxScreen } from './src/screens/InboxScreen';
 import { CalendarItemEditScreen } from './src/screens/CalendarItemEditScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { UndatedTaskListScreen } from './src/screens/UndatedTaskListScreen';
 import { CalendarItem } from './src/types/CalendarItem';
 import { configureForegroundNotificationHandling } from './src/services/notifications';
 
@@ -25,6 +26,7 @@ type ActiveScreen =
   | { name: 'calendar' }
   | { name: 'invite' }
   | { name: 'inbox'; mode: 'list' | 'compose' }
+  | { name: 'undated-tasks' }
   | { name: 'edit'; item: CalendarItem }
   | { name: 'create-event'; presetDate: Date }
   | { name: 'settings' };
@@ -98,6 +100,13 @@ function AppContent() {
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             user={user}
           />
+        ) : activeScreen.name === 'undated-tasks' ? (
+          <UndatedTaskListScreen
+            db={db}
+            onBack={() => setActiveScreen({ name: 'calendar' })}
+            onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
+            user={user}
+          />
         ) : activeScreen.name === 'edit' ? (
           <CalendarItemEditScreen
             mode="edit"
@@ -107,7 +116,9 @@ function AppContent() {
               setActiveScreen(
                 activeScreen.item.status === 'inbox'
                   ? { name: 'inbox', mode: 'list' }
-                  : { name: 'calendar' }
+                  : activeScreen.item.type === 'task' && activeScreen.item.dueAt === null
+                    ? { name: 'undated-tasks' }
+                    : { name: 'calendar' }
               )
             }
             onDeleted={() => setActiveScreen({ name: 'calendar' })}
@@ -140,6 +151,7 @@ function AppContent() {
             }
             onOpenInbox={() => setActiveScreen({ name: 'inbox', mode: 'list' })}
             onOpenInboxComposer={() => setActiveScreen({ name: 'inbox', mode: 'compose' })}
+            onOpenUndatedTasks={() => setActiveScreen({ name: 'undated-tasks' })}
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             onOpenSettings={() => setActiveScreen({ name: 'settings' })}
             user={user}
