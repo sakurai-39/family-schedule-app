@@ -53,5 +53,8 @@
     "prettier": "^3.8.3",
     "typescript": "~5.9.2"
   },
+  "overrides": {
+    "uuid": "11.1.1"
+  },
   "private": true
 }
