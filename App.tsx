@@ -11,6 +11,7 @@ import { InviteScreen } from './src/screens/InviteScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { InboxScreen } from './src/screens/InboxScreen';
 import { CalendarItemEditScreen } from './src/screens/CalendarItemEditScreen';
+import { DateItemListScreen } from './src/screens/DateItemListScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { UndatedTaskListScreen } from './src/screens/UndatedTaskListScreen';
 import { CalendarItem } from './src/types/CalendarItem';
@@ -22,13 +23,17 @@ const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
-type ActiveScreen =
+type ReturnScreen =
   | { name: 'calendar' }
-  | { name: 'invite' }
   | { name: 'inbox'; mode: 'list' | 'compose' }
-  | { name: 'undated-tasks' }
-  | { name: 'edit'; item: CalendarItem }
-  | { name: 'create-event'; presetDate: Date }
+  | { name: 'date-items'; date: Date }
+  | { name: 'undated-tasks' };
+
+type ActiveScreen =
+  | ReturnScreen
+  | { name: 'invite' }
+  | { name: 'edit'; item: CalendarItem; returnTo?: ReturnScreen }
+  | { name: 'create-event'; presetDate: Date; returnTo?: ReturnScreen }
   | { name: 'settings' };
 
 export default function App() {
@@ -107,22 +112,37 @@ function AppContent() {
             onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             user={user}
           />
+        ) : activeScreen.name === 'date-items' ? (
+          <DateItemListScreen
+            date={activeScreen.date}
+            db={db}
+            onBack={() => setActiveScreen({ name: 'calendar' })}
+            onCreateEventForDate={(date) =>
+              setActiveScreen({
+                name: 'create-event',
+                presetDate: date,
+                returnTo: { name: 'date-items', date },
+              })
+            }
+            onOpenItem={(item) =>
+              setActiveScreen({
+                name: 'edit',
+                item,
+                returnTo: { name: 'date-items', date: activeScreen.date },
+              })
+            }
+            user={user}
+          />
         ) : activeScreen.name === 'edit' ? (
           <CalendarItemEditScreen
             mode="edit"
             db={db}
             item={activeScreen.item}
             onBack={() =>
-              setActiveScreen(
-                activeScreen.item.status === 'inbox'
-                  ? { name: 'inbox', mode: 'list' }
-                  : activeScreen.item.type === 'task' && activeScreen.item.dueAt === null
-                    ? { name: 'undated-tasks' }
-                    : { name: 'calendar' }
-              )
+              setActiveScreen(getEditReturnScreen(activeScreen.item, activeScreen.returnTo))
             }
-            onDeleted={() => setActiveScreen({ name: 'calendar' })}
-            onSaved={() => setActiveScreen({ name: 'calendar' })}
+            onDeleted={() => setActiveScreen(activeScreen.returnTo ?? { name: 'calendar' })}
+            onSaved={() => setActiveScreen(activeScreen.returnTo ?? { name: 'calendar' })}
             user={user}
           />
         ) : activeScreen.name === 'create-event' ? (
@@ -130,8 +150,8 @@ function AppContent() {
             mode="create"
             db={db}
             presetDate={activeScreen.presetDate}
-            onBack={() => setActiveScreen({ name: 'calendar' })}
-            onSaved={() => setActiveScreen({ name: 'calendar' })}
+            onBack={() => setActiveScreen(activeScreen.returnTo ?? { name: 'calendar' })}
+            onSaved={() => setActiveScreen(activeScreen.returnTo ?? { name: 'calendar' })}
             user={user}
           />
         ) : activeScreen.name === 'settings' ? (
@@ -149,10 +169,10 @@ function AppContent() {
             onCreateEventForDate={(date) =>
               setActiveScreen({ name: 'create-event', presetDate: date })
             }
+            onOpenDateItems={(date) => setActiveScreen({ name: 'date-items', date })}
             onOpenInbox={() => setActiveScreen({ name: 'inbox', mode: 'list' })}
             onOpenInboxComposer={() => setActiveScreen({ name: 'inbox', mode: 'compose' })}
             onOpenUndatedTasks={() => setActiveScreen({ name: 'undated-tasks' })}
-            onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
             onOpenSettings={() => setActiveScreen({ name: 'settings' })}
             user={user}
           />
@@ -174,6 +194,13 @@ function AppContent() {
       <StatusBar style="auto" />
     </>
   );
+}
+
+function getEditReturnScreen(item: CalendarItem, returnTo?: ReturnScreen): ReturnScreen {
+  if (returnTo) return returnTo;
+  if (item.status === 'inbox') return { name: 'inbox', mode: 'list' };
+  if (item.type === 'task' && item.dueAt === null) return { name: 'undated-tasks' };
+  return { name: 'calendar' };
 }
 
 const styles = StyleSheet.create({
