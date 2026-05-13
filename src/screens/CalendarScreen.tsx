@@ -4,31 +4,30 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
-import { CalendarItem, AssigneeValue } from '../types/CalendarItem';
-import { CalendarItemCard } from '../components/CalendarItemCard';
-import { AssigneeBadgeTone } from '../components/AssigneeBadge';
+import { CalendarItem } from '../types/CalendarItem';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { useCalendarItems } from '../hooks/useCalendarItems';
 import { useNotificationSync } from '../hooks/useNotificationSync';
 import {
   buildMonthGrid,
   getDisplayDate,
-  getItemsForDate,
   getUndatedTasks,
-  splitCompletedItems,
   toLocalDateKey,
 } from '../utils/calendarDisplay';
-import { updateCalendarItem } from '../services/firestore';
+import {
+  buildCalendarCellPresentation,
+  CalendarCellAssigneeTone,
+} from '../utils/calendarCellPresentation';
 
 type CalendarScreenProps = {
   db: Firestore;
   user: User;
-  onOpenSettings: () => void;
+  onCreateEventForDate: (date: Date) => void;
+  onOpenDateItems: (date: Date) => void;
   onOpenInbox: () => void;
   onOpenInboxComposer: () => void;
+  onOpenSettings: () => void;
   onOpenUndatedTasks: () => void;
-  onOpenItem: (item: CalendarItem) => void;
-  onCreateEventForDate: (date: Date) => void;
 };
 
 const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
@@ -37,12 +36,12 @@ const MAX_ITEMS_PER_CELL = 2;
 export function CalendarScreen({
   db,
   user,
-  onOpenSettings,
+  onCreateEventForDate,
+  onOpenDateItems,
   onOpenInbox,
   onOpenInboxComposer,
+  onOpenSettings,
   onOpenUndatedTasks,
-  onOpenItem,
-  onCreateEventForDate,
 }: CalendarScreenProps) {
   const insets = useSafeAreaInsets();
   const householdId = user.householdId;
@@ -51,9 +50,6 @@ export function CalendarScreen({
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [selectedDate, setSelectedDate] = useState(today);
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const { items, isLoading, errorMessage } = useCalendarItems(db, householdId);
   const notificationSync = useNotificationSync({
     householdId,
@@ -89,13 +85,11 @@ export function CalendarScreen({
     return map;
   }, [items]);
 
-  const selectedItems = useMemo(() => getItemsForDate(items, selectedDate), [items, selectedDate]);
   const undatedTasks = useMemo(() => getUndatedTasks(items), [items]);
   const openUndatedTaskCount = useMemo(
     () => undatedTasks.filter((item) => !item.isCompleted).length,
     [undatedTasks]
   );
-  const { open, completed } = useMemo(() => splitCompletedItems(selectedItems), [selectedItems]);
 
   const handleMoveMonth = (amount: number) => {
     const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + amount, 1);
@@ -119,25 +113,10 @@ export function CalendarScreen({
     [visibleMonth]
   );
 
-  const handleSelectDate = (date: Date) => {
+  const handleOpenDateItems = (date: Date) => {
     setSelectedDate(date);
     setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-  };
-
-  const handleToggleCompleted = async (item: CalendarItem) => {
-    if (!householdId) return;
-
-    setUpdatingItemId(item.itemId);
-    setActionError(null);
-    try {
-      await updateCalendarItem(db, householdId, item.itemId, {
-        isCompleted: !item.isCompleted,
-      });
-    } catch {
-      setActionError('完了状態の更新に失敗しました。時間をおいて再度お試しください。');
-    } finally {
-      setUpdatingItemId(null);
-    }
+    onOpenDateItems(date);
   };
 
   const bottomNavReservedHeight = 96 + insets.bottom;
@@ -185,7 +164,7 @@ export function CalendarScreen({
                 <Pressable
                   accessibilityRole="button"
                   key={day.dateKey}
-                  onPress={() => handleSelectDate(day.date)}
+                  onPress={() => handleOpenDateItems(day.date)}
                   style={[
                     styles.dayCell,
                     !day.isCurrentMonth && styles.otherMonthCell,
@@ -203,18 +182,37 @@ export function CalendarScreen({
                     {day.dayOfMonth}
                   </Text>
                   <View style={styles.cellItemsArea}>
-                    {visibleItems.map((item) => (
-                      <Text
-                        key={item.itemId}
-                        numberOfLines={1}
-                        style={[styles.cellItemText, isSelected && styles.cellItemTextSelected]}
-                      >
-                        {item.title}
-                      </Text>
-                    ))}
+                    {visibleItems.map((item) => {
+                      const presentation = buildCalendarCellPresentation(item, user.userId, 8);
+                      return (
+                        <View
+                          key={item.itemId}
+                          style={[
+                            styles.cellItemPill,
+                            cellToneStyles[presentation.assigneeTone],
+                            isSelected && styles.cellItemPillSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[styles.cellItemKind, isSelected && styles.cellItemKindSelected]}
+                          >
+                            {presentation.kindLabel}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.cellItemTitle,
+                              isSelected && styles.cellItemTitleSelected,
+                            ]}
+                          >
+                            {presentation.title}
+                          </Text>
+                        </View>
+                      );
+                    })}
                     {overflowCount > 0 ? (
                       <Text
-                        style={[styles.cellOverflowText, isSelected && styles.cellItemTextSelected]}
+                        style={[styles.cellOverflowText, isSelected && styles.cellOverflowSelected]}
                       >
                         +{overflowCount}
                       </Text>
@@ -226,14 +224,8 @@ export function CalendarScreen({
           </View>
         </GestureDetector>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{formatListTitle(selectedDate)}</Text>
-          <Text style={styles.countText}>{selectedItems.length}件</Text>
-        </View>
-
-        {isLoading ? <Text style={styles.mutedText}>予定を読み込んでいます。</Text> : null}
+        {isLoading ? <Text style={styles.mutedText}>予定を読み込んでいます</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-        {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
         {notificationSync.errorMessage ? (
           <Text style={styles.errorText}>{notificationSync.errorMessage}</Text>
         ) : null}
@@ -249,55 +241,6 @@ export function CalendarScreen({
             </Text>
           </Pressable>
         ) : null}
-
-        <View style={styles.itemList}>
-          {open.map((item) => {
-            const assignee = getAssigneePresentation(item.assignee, user);
-            return (
-              <CalendarItemCard
-                assigneeLabel={assignee.label}
-                assigneeTone={assignee.tone}
-                isUpdating={updatingItemId === item.itemId}
-                item={item}
-                key={item.itemId}
-                onPress={onOpenItem}
-                onToggleCompleted={handleToggleCompleted}
-              />
-            );
-          })}
-        </View>
-
-        {completed.length > 0 ? (
-          <View style={styles.completedArea}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setShowCompleted((current) => !current)}
-              style={styles.completedToggle}
-            >
-              <Text style={styles.completedToggleText}>
-                完了済み {completed.length}件 {showCompleted ? '閉じる' : '表示'}
-              </Text>
-            </Pressable>
-            {showCompleted ? (
-              <View style={styles.itemList}>
-                {completed.map((item) => {
-                  const assignee = getAssigneePresentation(item.assignee, user);
-                  return (
-                    <CalendarItemCard
-                      assigneeLabel={assignee.label}
-                      assigneeTone={assignee.tone}
-                      isUpdating={updatingItemId === item.itemId}
-                      item={item}
-                      key={item.itemId}
-                      onPress={onOpenItem}
-                      onToggleCompleted={handleToggleCompleted}
-                    />
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
       </ScrollView>
 
       <BottomNavBar
@@ -311,35 +254,8 @@ export function CalendarScreen({
   );
 }
 
-function getAssigneePresentation(
-  assignee: AssigneeValue | null,
-  user: User
-): { label: string; tone: AssigneeBadgeTone } {
-  if (!assignee) {
-    return { label: '未定', tone: 'unknown' };
-  }
-
-  if (assignee === 'both') {
-    return { label: '両方', tone: 'both' };
-  }
-
-  if (assignee === 'whoever') {
-    return { label: 'どちらか', tone: 'whoever' };
-  }
-
-  if (assignee === user.userId) {
-    return { label: user.displayName || '自分', tone: 'self' };
-  }
-
-  return { label: '相手', tone: 'partner' };
-}
-
 function formatMonthTitle(date: Date): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
-}
-
-function formatListTitle(date: Date): string {
-  return `${date.getMonth() + 1}月${date.getDate()}日の予定`;
 }
 
 const styles = StyleSheet.create({
@@ -430,18 +346,37 @@ const styles = StyleSheet.create({
     gap: 2,
     marginTop: 2,
   },
-  cellItemText: {
-    backgroundColor: '#dfe7e3',
-    borderRadius: 3,
-    color: '#1a3d30',
+  cellItemPill: {
+    alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 2,
+    minHeight: 16,
+    overflow: 'hidden',
+    paddingHorizontal: 2,
+  },
+  cellItemPillSelected: {
+    backgroundColor: '#ffffff',
+    borderColor: '#ffffff',
+  },
+  cellItemKind: {
+    color: '#202124',
+    fontSize: 8,
+    fontWeight: '900',
+    lineHeight: 12,
+  },
+  cellItemKindSelected: {
+    color: '#205f4b',
+  },
+  cellItemTitle: {
+    color: '#202124',
+    flex: 1,
     fontSize: 9,
     fontWeight: '700',
-    overflow: 'hidden',
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    lineHeight: 12,
   },
-  cellItemTextSelected: {
-    backgroundColor: '#ffffff',
+  cellItemTitleSelected: {
     color: '#205f4b',
   },
   cellOverflowText: {
@@ -450,21 +385,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'right',
   },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 4,
-  },
-  sectionTitle: {
-    color: '#202124',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  countText: {
-    color: '#68706b',
-    fontSize: 13,
-    fontWeight: '700',
+  cellOverflowSelected: {
+    color: '#ffffff',
   },
   mutedText: {
     color: '#68706b',
@@ -476,36 +398,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  itemList: {
-    gap: 10,
-  },
-  completedArea: {
-    gap: 10,
-  },
-  completedToggle: {
-    backgroundColor: '#edf0ed',
-    borderRadius: 8,
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  completedToggleText: {
-    color: '#4d5751',
-    fontSize: 13,
-    fontWeight: '800',
-  },
   todoSummaryBanner: {
     backgroundColor: '#eaf4ee',
     borderColor: '#b7d2c4',
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 44,
     justifyContent: 'center',
+    minHeight: 44,
     paddingHorizontal: 14,
   },
   todoSummaryBannerText: {
     color: '#205f4b',
     fontSize: 14,
     fontWeight: '800',
+  },
+});
+
+const cellToneStyles = StyleSheet.create<Record<CalendarCellAssigneeTone, object>>({
+  self: {
+    backgroundColor: '#e4f3ec',
+    borderColor: '#8fc7aa',
+  },
+  partner: {
+    backgroundColor: '#fde8ef',
+    borderColor: '#eba6bd',
+  },
+  both: {
+    backgroundColor: '#efe8ff',
+    borderColor: '#b8a2e6',
+  },
+  whoever: {
+    backgroundColor: '#fff3cf',
+    borderColor: '#e2bd55',
+  },
+  unknown: {
+    backgroundColor: '#edf0ef',
+    borderColor: '#c4cbc7',
   },
 });
