@@ -1,6 +1,14 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
@@ -18,6 +26,7 @@ import {
   buildCalendarCellPresentation,
   CalendarCellAssigneeTone,
 } from '../utils/calendarCellPresentation';
+import { CalendarDateTone, getCalendarDateTone } from '../utils/japaneseHolidays';
 
 type CalendarScreenProps = {
   db: Firestore;
@@ -44,7 +53,10 @@ export function CalendarScreen({
   onOpenUndatedTasks,
 }: CalendarScreenProps) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const householdId = user.householdId;
+  const dragX = useRef(new Animated.Value(0)).current;
+  const isAnimatingMonthRef = useRef(false);
   const today = useMemo(() => new Date(), []);
   const [visibleMonth, setVisibleMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
@@ -91,26 +103,70 @@ export function CalendarScreen({
     [undatedTasks]
   );
 
-  const handleMoveMonth = (amount: number) => {
-    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + amount, 1);
-    setVisibleMonth(nextMonth);
-  };
+  const pageWidth = Math.max(windowWidth - 32, 1);
 
-  const swipeGesture = useMemo(
+  const animateMonthChange = useCallback(
+    (amount: number, velocity = 0) => {
+      if (isAnimatingMonthRef.current) return;
+      isAnimatingMonthRef.current = true;
+
+      Animated.timing(dragX, {
+        duration: Math.max(140, 220 - Math.min(Math.abs(velocity) * 80, 80)),
+        toValue: amount > 0 ? -pageWidth : pageWidth,
+        useNativeDriver: true,
+      }).start(() => {
+        setVisibleMonth(
+          (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1)
+        );
+        dragX.setValue(0);
+        isAnimatingMonthRef.current = false;
+      });
+    },
+    [dragX, pageWidth]
+  );
+
+  const resetSwipePosition = useCallback(
+    (velocity = 0) => {
+      Animated.spring(dragX, {
+        friction: 10,
+        tension: 90,
+        toValue: 0,
+        useNativeDriver: true,
+        velocity,
+      }).start();
+    },
+    [dragX]
+  );
+
+  const swipePanResponder = useMemo(
     () =>
-      Gesture.Pan()
-        .activeOffsetX([-30, 30])
-        .failOffsetY([-20, 20])
-        .onEnd((event) => {
-          if (event.translationX <= -50) {
-            handleMoveMonth(1);
-          } else if (event.translationX >= 50) {
-            handleMoveMonth(-1);
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4,
+        onPanResponderGrant: () => {
+          dragX.stopAnimation();
+        },
+        onPanResponderMove: (_, gesture) => {
+          const boundedX = Math.max(-pageWidth, Math.min(pageWidth, gesture.dx));
+          dragX.setValue(boundedX);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const shouldMoveNext = gesture.dx < -pageWidth * 0.18 || gesture.vx < -0.45;
+          const shouldMovePrevious = gesture.dx > pageWidth * 0.18 || gesture.vx > 0.45;
+
+          if (shouldMoveNext) {
+            animateMonthChange(1, gesture.vx);
+          } else if (shouldMovePrevious) {
+            animateMonthChange(-1, gesture.vx);
+          } else {
+            resetSwipePosition(gesture.vx);
           }
-        }),
-    // handleMoveMonth depends on visibleMonth so re-create on month change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visibleMonth]
+        },
+        onPanResponderTerminate: () => {
+          resetSwipePosition();
+        },
+      }),
+    [animateMonthChange, dragX, pageWidth, resetSwipePosition]
   );
 
   const handleOpenDateItems = (date: Date) => {
@@ -129,7 +185,7 @@ export function CalendarScreen({
         <View style={styles.monthHeader}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => handleMoveMonth(-1)}
+            onPress={() => animateMonthChange(-1)}
             style={styles.monthButton}
           >
             <Text style={styles.monthButtonText}>‹</Text>
@@ -137,7 +193,7 @@ export function CalendarScreen({
           <Text style={styles.monthTitle}>{formatMonthTitle(visibleMonth)}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => handleMoveMonth(1)}
+            onPress={() => animateMonthChange(1)}
             style={styles.monthButton}
           >
             <Text style={styles.monthButtonText}>›</Text>
@@ -145,17 +201,25 @@ export function CalendarScreen({
         </View>
 
         <View style={styles.weekRow}>
-          {weekLabels.map((label) => (
-            <Text key={label} style={styles.weekLabel}>
+          {weekLabels.map((label, index) => (
+            <Text
+              key={label}
+              style={[
+                styles.weekLabel,
+                index === 0 && styles.weekLabelSunday,
+                index === 6 && styles.weekLabelSaturday,
+              ]}
+            >
               {label}
             </Text>
           ))}
         </View>
 
-        <GestureDetector gesture={swipeGesture}>
-          <View style={styles.monthGrid}>
+        <View style={styles.monthGridFrame} {...swipePanResponder.panHandlers}>
+          <Animated.View style={[styles.monthGrid, { transform: [{ translateX: dragX }] }]}>
             {visibleMonthGrid.map((day) => {
               const isSelected = day.dateKey === toLocalDateKey(selectedDate);
+              const dateTone = getCalendarDateTone(day.date);
               const dayItems = itemsByDateKey.get(day.dateKey) ?? [];
               const visibleItems = dayItems.slice(0, MAX_ITEMS_PER_CELL);
               const overflowCount = dayItems.length - visibleItems.length;
@@ -167,6 +231,7 @@ export function CalendarScreen({
                   onPress={() => handleOpenDateItems(day.date)}
                   style={[
                     styles.dayCell,
+                    dateToneCellStyles[dateTone],
                     !day.isCurrentMonth && styles.otherMonthCell,
                     day.isToday && styles.todayCell,
                     isSelected && styles.selectedDayCell,
@@ -175,6 +240,7 @@ export function CalendarScreen({
                   <Text
                     style={[
                       styles.dayText,
+                      dateToneTextStyles[dateTone],
                       !day.isCurrentMonth && styles.otherMonthText,
                       isSelected && styles.selectedDayText,
                     ]}
@@ -221,8 +287,8 @@ export function CalendarScreen({
                 </Pressable>
               );
             })}
-          </View>
-        </GestureDetector>
+          </Animated.View>
+        </View>
 
         {isLoading ? <Text style={styles.mutedText}>予定を読み込んでいます</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
@@ -301,6 +367,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  weekLabelSaturday: {
+    color: '#2563a9',
+  },
+  weekLabelSunday: {
+    color: '#b42318',
+  },
+  monthGridFrame: {
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   monthGrid: {
     backgroundColor: '#ffffff',
@@ -434,5 +510,31 @@ const cellToneStyles = StyleSheet.create<Record<CalendarCellAssigneeTone, object
   unknown: {
     backgroundColor: '#edf0ef',
     borderColor: '#c4cbc7',
+  },
+});
+
+const dateToneCellStyles = StyleSheet.create<Record<CalendarDateTone, object>>({
+  weekday: {},
+  saturday: {
+    backgroundColor: '#f3f8ff',
+  },
+  sunday: {
+    backgroundColor: '#fff4f3',
+  },
+  holiday: {
+    backgroundColor: '#fff0ed',
+  },
+});
+
+const dateToneTextStyles = StyleSheet.create<Record<CalendarDateTone, object>>({
+  weekday: {},
+  saturday: {
+    color: '#2563a9',
+  },
+  sunday: {
+    color: '#b42318',
+  },
+  holiday: {
+    color: '#b42318',
   },
 });
