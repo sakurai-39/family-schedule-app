@@ -42,6 +42,10 @@ type CalendarScreenProps = {
 const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
 const MAX_ITEMS_PER_CELL = 2;
 
+function getMonthDate(baseDate: Date, offset: number): Date {
+  return new Date(baseDate.getFullYear(), baseDate.getMonth() + offset, 1);
+}
+
 export function CalendarScreen({
   db,
   user,
@@ -70,16 +74,17 @@ export function CalendarScreen({
     enabled: !isLoading,
   });
 
-  const monthGrid = useMemo(() => buildMonthGrid(visibleMonth, today), [today, visibleMonth]);
-  const visibleMonthGrid = useMemo(() => {
-    let lastCurrentMonthIndex = 0;
-    for (let i = 0; i < monthGrid.length; i++) {
-      const cell = monthGrid[i];
-      if (cell?.isCurrentMonth) lastCurrentMonthIndex = i;
-    }
-    const weeksNeeded = Math.max(5, Math.ceil((lastCurrentMonthIndex + 1) / 7));
-    return monthGrid.slice(0, weeksNeeded * 7);
-  }, [monthGrid]);
+  const monthPages = useMemo(
+    () =>
+      [-1, 0, 1].map((offset) => {
+        const month = getMonthDate(visibleMonth, offset);
+        return {
+          month,
+          visibleDays: getVisibleMonthGrid(buildMonthGrid(month, today)),
+        };
+      }),
+    [today, visibleMonth]
+  );
 
   const itemsByDateKey = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
@@ -147,7 +152,7 @@ export function CalendarScreen({
           dragX.stopAnimation();
         },
         onPanResponderMove: (_, gesture) => {
-          const boundedX = Math.max(-pageWidth, Math.min(pageWidth, gesture.dx));
+          const boundedX = Math.max(-pageWidth * 0.98, Math.min(pageWidth * 0.98, gesture.dx));
           dragX.setValue(boundedX);
         },
         onPanResponderRelease: (_, gesture) => {
@@ -176,6 +181,7 @@ export function CalendarScreen({
   };
 
   const bottomNavReservedHeight = 96 + insets.bottom;
+  const monthPagerTranslateX = Animated.add(dragX, -pageWidth);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -216,77 +222,30 @@ export function CalendarScreen({
         </View>
 
         <View style={styles.monthGridFrame} {...swipePanResponder.panHandlers}>
-          <Animated.View style={[styles.monthGrid, { transform: [{ translateX: dragX }] }]}>
-            {visibleMonthGrid.map((day) => {
-              const isSelected = day.dateKey === toLocalDateKey(selectedDate);
-              const dateTone = getCalendarDateTone(day.date);
-              const dayItems = itemsByDateKey.get(day.dateKey) ?? [];
-              const visibleItems = dayItems.slice(0, MAX_ITEMS_PER_CELL);
-              const overflowCount = dayItems.length - visibleItems.length;
-
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  key={day.dateKey}
-                  onPress={() => handleOpenDateItems(day.date)}
-                  style={[
-                    styles.dayCell,
-                    dateToneCellStyles[dateTone],
-                    !day.isCurrentMonth && styles.otherMonthCell,
-                    day.isToday && styles.todayCell,
-                    isSelected && styles.selectedDayCell,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dayText,
-                      dateToneTextStyles[dateTone],
-                      !day.isCurrentMonth && styles.otherMonthText,
-                      isSelected && styles.selectedDayText,
-                    ]}
-                  >
-                    {day.dayOfMonth}
-                  </Text>
-                  <View style={styles.cellItemsArea}>
-                    {visibleItems.map((item) => {
-                      const presentation = buildCalendarCellPresentation(item, user.userId, 8);
-                      return (
-                        <View
-                          key={item.itemId}
-                          style={[
-                            styles.cellItemPill,
-                            cellToneStyles[presentation.assigneeTone],
-                            isSelected && styles.cellItemPillSelected,
-                          ]}
-                        >
-                          <Text
-                            style={[styles.cellItemKind, isSelected && styles.cellItemKindSelected]}
-                          >
-                            {presentation.kindLabel}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.cellItemTitle,
-                              isSelected && styles.cellItemTitleSelected,
-                            ]}
-                          >
-                            {presentation.title}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                    {overflowCount > 0 ? (
-                      <Text
-                        style={[styles.cellOverflowText, isSelected && styles.cellOverflowSelected]}
-                      >
-                        +{overflowCount}
-                      </Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-              );
-            })}
+          <Animated.View
+            style={[
+              styles.monthPager,
+              { transform: [{ translateX: monthPagerTranslateX }], width: pageWidth * 3 },
+            ]}
+          >
+            {monthPages.map((page) => (
+              <View
+                key={toLocalDateKey(page.month)}
+                style={[styles.monthPage, { width: pageWidth }]}
+              >
+                <View style={styles.monthGrid}>
+                  {page.visibleDays.map((day) =>
+                    renderDayCell({
+                      day,
+                      isSelected: day.dateKey === toLocalDateKey(selectedDate),
+                      items: itemsByDateKey.get(day.dateKey) ?? [],
+                      onPress: () => handleOpenDateItems(day.date),
+                      userId: user.userId,
+                    })
+                  )}
+                </View>
+              </View>
+            ))}
           </Animated.View>
         </View>
 
@@ -322,6 +281,90 @@ export function CalendarScreen({
 
 function formatMonthTitle(date: Date): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+function getVisibleMonthGrid(monthGrid: ReturnType<typeof buildMonthGrid>) {
+  let lastCurrentMonthIndex = 0;
+  for (let i = 0; i < monthGrid.length; i++) {
+    const cell = monthGrid[i];
+    if (cell?.isCurrentMonth) lastCurrentMonthIndex = i;
+  }
+  const weeksNeeded = Math.max(5, Math.ceil((lastCurrentMonthIndex + 1) / 7));
+  return monthGrid.slice(0, weeksNeeded * 7);
+}
+
+function renderDayCell({
+  day,
+  isSelected,
+  items,
+  onPress,
+  userId,
+}: {
+  day: ReturnType<typeof buildMonthGrid>[number];
+  isSelected: boolean;
+  items: CalendarItem[];
+  onPress: () => void;
+  userId: string;
+}) {
+  const dateTone = getCalendarDateTone(day.date);
+  const visibleItems = items.slice(0, MAX_ITEMS_PER_CELL);
+  const overflowCount = items.length - visibleItems.length;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      key={day.dateKey}
+      onPress={onPress}
+      style={[
+        styles.dayCell,
+        dateToneCellStyles[dateTone],
+        !day.isCurrentMonth && styles.otherMonthCell,
+        day.isToday && styles.todayCell,
+        isSelected && styles.selectedDayCell,
+      ]}
+    >
+      <Text
+        style={[
+          styles.dayText,
+          dateToneTextStyles[dateTone],
+          !day.isCurrentMonth && styles.otherMonthText,
+          isSelected && styles.selectedDayText,
+        ]}
+      >
+        {day.dayOfMonth}
+      </Text>
+      <View style={styles.cellItemsArea}>
+        {visibleItems.map((item) => {
+          const presentation = buildCalendarCellPresentation(item, userId, 8);
+          return (
+            <View
+              key={item.itemId}
+              style={[
+                styles.cellItemPill,
+                cellToneStyles[presentation.assigneeTone],
+                isSelected && styles.cellItemPillSelected,
+              ]}
+            >
+              <Text style={[styles.cellItemKind, isSelected && styles.cellItemKindSelected]}>
+                {presentation.kindLabel}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.cellItemTitle, isSelected && styles.cellItemTitleSelected]}
+              >
+                {presentation.title}
+              </Text>
+            </View>
+          );
+        })}
+        {overflowCount > 0 ? (
+          <Text style={[styles.cellOverflowText, isSelected && styles.cellOverflowSelected]}>
+            +{overflowCount}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -377,6 +420,12 @@ const styles = StyleSheet.create({
   monthGridFrame: {
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  monthPager: {
+    flexDirection: 'row',
+  },
+  monthPage: {
+    backgroundColor: '#ffffff',
   },
   monthGrid: {
     backgroundColor: '#ffffff',
