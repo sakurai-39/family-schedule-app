@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { auth, db } from './src/services/firebase';
 import { AuthProvider, useAuth } from './src/hooks/useAuthFlow';
@@ -38,13 +37,11 @@ type ActiveScreen =
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider auth={auth} db={db}>
-          <AppContent />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <AuthProvider auth={auth} db={db}>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
