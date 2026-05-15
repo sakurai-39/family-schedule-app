@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  PanResponder,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,7 @@ import { useCalendarItems } from '../hooks/useCalendarItems';
 import { useNotificationSync } from '../hooks/useNotificationSync';
 import {
   buildMonthGrid,
+  CalendarDay,
   getDisplayDate,
   getUndatedTasks,
   toLocalDateKey,
@@ -41,9 +43,25 @@ type CalendarScreenProps = {
 
 const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
 const MAX_ITEMS_PER_CELL = 2;
+const MONTH_PAGE_RADIUS = 60;
+const MONTH_PAGE_COUNT = MONTH_PAGE_RADIUS * 2 + 1;
+
+type MonthPage = {
+  key: string;
+  month: Date;
+  visibleDays: CalendarDay[];
+};
 
 function getMonthDate(baseDate: Date, offset: number): Date {
   return new Date(baseDate.getFullYear(), baseDate.getMonth() + offset, 1);
+}
+
+function getMonthOffset(fromMonth: Date, toMonth: Date): number {
+  return (
+    (toMonth.getFullYear() - fromMonth.getFullYear()) * 12 +
+    toMonth.getMonth() -
+    fromMonth.getMonth()
+  );
 }
 
 export function CalendarScreen({
@@ -59,11 +77,13 @@ export function CalendarScreen({
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const householdId = user.householdId;
-  const dragX = useRef(new Animated.Value(0)).current;
-  const isAnimatingMonthRef = useRef(false);
+  const monthListRef = useRef<FlatList<MonthPage>>(null);
   const today = useMemo(() => new Date(), []);
-  const [visibleMonth, setVisibleMonth] = useState(
-    new Date(today.getFullYear(), today.getMonth(), 1)
+  const baseMonth = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(MONTH_PAGE_RADIUS);
+  const visibleMonth = useMemo(
+    () => getMonthDate(baseMonth, currentPageIndex - MONTH_PAGE_RADIUS),
+    [baseMonth, currentPageIndex]
   );
   const [selectedDate, setSelectedDate] = useState(today);
   const { items, isLoading, errorMessage } = useCalendarItems(db, householdId);
@@ -76,14 +96,15 @@ export function CalendarScreen({
 
   const monthPages = useMemo(
     () =>
-      [-1, 0, 1].map((offset) => {
-        const month = getMonthDate(visibleMonth, offset);
+      Array.from({ length: MONTH_PAGE_COUNT }, (_, index) => {
+        const month = getMonthDate(baseMonth, index - MONTH_PAGE_RADIUS);
         return {
+          key: toLocalDateKey(month),
           month,
           visibleDays: getVisibleMonthGrid(buildMonthGrid(month, today)),
         };
       }),
-    [today, visibleMonth]
+    [baseMonth, today]
   );
 
   const itemsByDateKey = useMemo(() => {
@@ -110,78 +131,50 @@ export function CalendarScreen({
 
   const pageWidth = Math.max(windowWidth - 32, 1);
 
-  const animateMonthChange = useCallback(
-    (amount: number, velocity = 0) => {
-      if (isAnimatingMonthRef.current) return;
-      isAnimatingMonthRef.current = true;
+  const scrollToPageIndex = useCallback((index: number, animated = true) => {
+    const nextIndex = Math.max(0, Math.min(MONTH_PAGE_COUNT - 1, index));
+    setCurrentPageIndex(nextIndex);
+    monthListRef.current?.scrollToIndex({ animated, index: nextIndex });
+  }, []);
 
-      Animated.timing(dragX, {
-        duration: Math.max(140, 220 - Math.min(Math.abs(velocity) * 80, 80)),
-        toValue: amount > 0 ? -pageWidth : pageWidth,
-        useNativeDriver: true,
-      }).start(() => {
-        setVisibleMonth(
-          (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1)
-        );
-        dragX.setValue(0);
-        isAnimatingMonthRef.current = false;
-      });
+  const syncPageIndexFromScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+      setCurrentPageIndex(Math.max(0, Math.min(MONTH_PAGE_COUNT - 1, nextIndex)));
     },
-    [dragX, pageWidth]
+    [pageWidth]
   );
 
-  const resetSwipePosition = useCallback(
-    (velocity = 0) => {
-      Animated.spring(dragX, {
-        friction: 10,
-        tension: 90,
-        toValue: 0,
-        useNativeDriver: true,
-        velocity,
-      }).start();
+  const handleOpenDateItems = useCallback(
+    (date: Date) => {
+      setSelectedDate(date);
+      const targetMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      scrollToPageIndex(MONTH_PAGE_RADIUS + getMonthOffset(baseMonth, targetMonth), false);
+      onOpenDateItems(date);
     },
-    [dragX]
+    [baseMonth, onOpenDateItems, scrollToPageIndex]
   );
 
-  const swipePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4,
-        onPanResponderGrant: () => {
-          dragX.stopAnimation();
-        },
-        onPanResponderMove: (_, gesture) => {
-          const boundedX = Math.max(-pageWidth * 0.98, Math.min(pageWidth * 0.98, gesture.dx));
-          dragX.setValue(boundedX);
-        },
-        onPanResponderRelease: (_, gesture) => {
-          const shouldMoveNext = gesture.dx < -pageWidth * 0.18 || gesture.vx < -0.45;
-          const shouldMovePrevious = gesture.dx > pageWidth * 0.18 || gesture.vx > 0.45;
-
-          if (shouldMoveNext) {
-            animateMonthChange(1, gesture.vx);
-          } else if (shouldMovePrevious) {
-            animateMonthChange(-1, gesture.vx);
-          } else {
-            resetSwipePosition(gesture.vx);
-          }
-        },
-        onPanResponderTerminate: () => {
-          resetSwipePosition();
-        },
-      }),
-    [animateMonthChange, dragX, pageWidth, resetSwipePosition]
+  const renderMonthPage = useCallback(
+    ({ item: page }: { item: MonthPage }) => (
+      <View style={[styles.monthPage, { width: pageWidth }]}>
+        <View style={styles.monthGrid}>
+          {page.visibleDays.map((day) =>
+            renderDayCell({
+              day,
+              isSelected: day.dateKey === toLocalDateKey(selectedDate),
+              items: itemsByDateKey.get(day.dateKey) ?? [],
+              onPress: () => handleOpenDateItems(day.date),
+              userId: user.userId,
+            })
+          )}
+        </View>
+      </View>
+    ),
+    [handleOpenDateItems, itemsByDateKey, pageWidth, selectedDate, user.userId]
   );
-
-  const handleOpenDateItems = (date: Date) => {
-    setSelectedDate(date);
-    setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-    onOpenDateItems(date);
-  };
 
   const bottomNavReservedHeight = 96 + insets.bottom;
-  const monthPagerTranslateX = Animated.add(dragX, -pageWidth);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -191,7 +184,7 @@ export function CalendarScreen({
         <View style={styles.monthHeader}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => animateMonthChange(-1)}
+            onPress={() => scrollToPageIndex(currentPageIndex - 1)}
             style={styles.monthButton}
           >
             <Text style={styles.monthButtonText}>‹</Text>
@@ -199,7 +192,7 @@ export function CalendarScreen({
           <Text style={styles.monthTitle}>{formatMonthTitle(visibleMonth)}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => animateMonthChange(1)}
+            onPress={() => scrollToPageIndex(currentPageIndex + 1)}
             style={styles.monthButton}
           >
             <Text style={styles.monthButtonText}>›</Text>
@@ -221,32 +214,32 @@ export function CalendarScreen({
           ))}
         </View>
 
-        <View style={styles.monthGridFrame} {...swipePanResponder.panHandlers}>
-          <Animated.View
-            style={[
-              styles.monthPager,
-              { transform: [{ translateX: monthPagerTranslateX }], width: pageWidth * 3 },
-            ]}
-          >
-            {monthPages.map((page) => (
-              <View
-                key={toLocalDateKey(page.month)}
-                style={[styles.monthPage, { width: pageWidth }]}
-              >
-                <View style={styles.monthGrid}>
-                  {page.visibleDays.map((day) =>
-                    renderDayCell({
-                      day,
-                      isSelected: day.dateKey === toLocalDateKey(selectedDate),
-                      items: itemsByDateKey.get(day.dateKey) ?? [],
-                      onPress: () => handleOpenDateItems(day.date),
-                      userId: user.userId,
-                    })
-                  )}
-                </View>
-              </View>
-            ))}
-          </Animated.View>
+        <View style={styles.monthGridFrame}>
+          <FlatList
+            ref={monthListRef}
+            data={monthPages}
+            decelerationRate="fast"
+            directionalLockEnabled
+            getItemLayout={(_, index) => ({
+              index,
+              length: pageWidth,
+              offset: pageWidth * index,
+            })}
+            horizontal
+            initialScrollIndex={MONTH_PAGE_RADIUS}
+            keyExtractor={(page) => page.key}
+            onMomentumScrollEnd={syncPageIndexFromScroll}
+            onScrollToIndexFailed={(info) => {
+              monthListRef.current?.scrollToOffset({
+                animated: false,
+                offset: info.index * pageWidth,
+              });
+            }}
+            pagingEnabled
+            renderItem={renderMonthPage}
+            scrollEventThrottle={16}
+            showsHorizontalScrollIndicator={false}
+          />
         </View>
 
         {isLoading ? <Text style={styles.mutedText}>予定を読み込んでいます</Text> : null}
@@ -420,9 +413,6 @@ const styles = StyleSheet.create({
   monthGridFrame: {
     borderRadius: 8,
     overflow: 'hidden',
-  },
-  monthPager: {
-    flexDirection: 'row',
   },
   monthPage: {
     backgroundColor: '#ffffff',
