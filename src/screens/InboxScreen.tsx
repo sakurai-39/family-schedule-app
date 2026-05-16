@@ -10,7 +10,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import { CalendarItem, TITLE_MAX_LENGTH } from '../types/CalendarItem';
@@ -65,7 +64,7 @@ export function InboxScreen({ db, mode, user, onBack, onOpenItem }: InboxScreenP
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flexFill}
@@ -138,7 +137,7 @@ export function InboxScreen({ db, mode, user, onBack, onOpenItem }: InboxScreenP
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

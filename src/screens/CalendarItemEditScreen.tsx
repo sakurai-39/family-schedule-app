@@ -10,7 +10,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { User } from '../types/User';
 import {
@@ -169,7 +168,7 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flexFill}
@@ -282,7 +281,7 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -301,8 +300,9 @@ async function saveExistingItem(
 }
 
 function getEyebrowText(props: CalendarItemEditScreenProps): string {
-  if (props.mode === 'create') return '新しい予定を追加';
-  return props.item.status === 'inbox' ? 'メモを予定にする' : '予定を編集';
+  if (props.mode === 'create') return '予定・タスクを追加';
+  if (props.item.status === 'inbox') return 'メモを整理する';
+  return props.item.type === 'task' ? 'タスクを編集' : '予定を編集';
 }
 
 function getTitleText(props: CalendarItemEditScreenProps): string {
