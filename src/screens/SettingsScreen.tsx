@@ -9,7 +9,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { DISPLAY_NAME_MAX_LENGTH, User } from '../types/User';
 import { updateUser } from '../services/firestore';
@@ -70,7 +69,7 @@ export function SettingsScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flexFill}
@@ -160,7 +159,7 @@ export function SettingsScreen({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

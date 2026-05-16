@@ -85,7 +85,7 @@ export function BottomNavBar({
           onPress={handleAddEvent}
           style={[styles.popupButton, styles.popupButtonPrimary]}
         >
-          <Text style={styles.popupButtonText}>予定を追加</Text>
+          <Text style={styles.popupButtonText}>予定・タスクを追加</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -104,7 +104,7 @@ export function BottomNavBar({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="予定またはメモを追加"
+          accessibilityLabel="予定・タスクまたはメモを追加"
           onPress={toggleMenu}
           style={styles.fab}
         >

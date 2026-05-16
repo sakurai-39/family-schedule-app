@@ -78,9 +78,10 @@ export function CalendarScreen({
   const { width: windowWidth } = useWindowDimensions();
   const householdId = user.householdId;
   const monthListRef = useRef<FlatList<MonthPage>>(null);
+  const currentPageIndexRef = useRef(MONTH_PAGE_RADIUS);
   const today = useMemo(() => new Date(), []);
   const baseMonth = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today]);
-  const [currentPageIndex, setCurrentPageIndex] = useState(MONTH_PAGE_RADIUS);
+  const [currentPageIndex, setCurrentPageIndexState] = useState(MONTH_PAGE_RADIUS);
   const visibleMonth = useMemo(
     () => getMonthDate(baseMonth, currentPageIndex - MONTH_PAGE_RADIUS),
     [baseMonth, currentPageIndex]
@@ -131,18 +132,45 @@ export function CalendarScreen({
 
   const pageWidth = Math.max(windowWidth - 32, 1);
 
-  const scrollToPageIndex = useCallback((index: number, animated = true) => {
+  const updateCurrentPageIndex = useCallback((index: number) => {
     const nextIndex = Math.max(0, Math.min(MONTH_PAGE_COUNT - 1, index));
-    setCurrentPageIndex(nextIndex);
-    monthListRef.current?.scrollToIndex({ animated, index: nextIndex });
+    if (currentPageIndexRef.current === nextIndex) return;
+
+    currentPageIndexRef.current = nextIndex;
+    setCurrentPageIndexState(nextIndex);
   }, []);
+
+  const scrollToPageIndex = useCallback(
+    (index: number, animated = true) => {
+      const nextIndex = Math.max(0, Math.min(MONTH_PAGE_COUNT - 1, index));
+      updateCurrentPageIndex(nextIndex);
+      monthListRef.current?.scrollToOffset({
+        animated,
+        offset: nextIndex * pageWidth,
+      });
+    },
+    [pageWidth, updateCurrentPageIndex]
+  );
+
+  const syncPageIndexFromOffset = useCallback(
+    (offsetX: number) => {
+      updateCurrentPageIndex(Math.round(offsetX / pageWidth));
+    },
+    [pageWidth, updateCurrentPageIndex]
+  );
+
+  const handleMonthScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      syncPageIndexFromOffset(event.nativeEvent.contentOffset.x);
+    },
+    [syncPageIndexFromOffset]
+  );
 
   const syncPageIndexFromScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
-      setCurrentPageIndex(Math.max(0, Math.min(MONTH_PAGE_COUNT - 1, nextIndex)));
+      syncPageIndexFromOffset(event.nativeEvent.contentOffset.x);
     },
-    [pageWidth]
+    [syncPageIndexFromOffset]
   );
 
   const handleOpenDateItems = useCallback(
@@ -184,7 +212,7 @@ export function CalendarScreen({
         <View style={styles.monthHeader}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => scrollToPageIndex(currentPageIndex - 1)}
+            onPress={() => scrollToPageIndex(currentPageIndex - 1, false)}
             style={styles.monthButton}
           >
             <Text style={styles.monthButtonText}>‹</Text>
@@ -192,7 +220,7 @@ export function CalendarScreen({
           <Text style={styles.monthTitle}>{formatMonthTitle(visibleMonth)}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => scrollToPageIndex(currentPageIndex + 1)}
+            onPress={() => scrollToPageIndex(currentPageIndex + 1, false)}
             style={styles.monthButton}
           >
             <Text style={styles.monthButtonText}>›</Text>
@@ -227,8 +255,11 @@ export function CalendarScreen({
             })}
             horizontal
             initialScrollIndex={MONTH_PAGE_RADIUS}
+            initialNumToRender={3}
             keyExtractor={(page) => page.key}
+            maxToRenderPerBatch={3}
             onMomentumScrollEnd={syncPageIndexFromScroll}
+            onScroll={handleMonthScroll}
             onScrollToIndexFailed={(info) => {
               monthListRef.current?.scrollToOffset({
                 animated: false,
@@ -237,8 +268,10 @@ export function CalendarScreen({
             }}
             pagingEnabled
             renderItem={renderMonthPage}
+            removeClippedSubviews
             scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
+            windowSize={5}
           />
         </View>
 

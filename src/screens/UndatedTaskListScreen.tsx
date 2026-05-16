@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { CalendarItem, AssigneeValue } from '../types/CalendarItem';
 import { User } from '../types/User';
@@ -49,7 +48,7 @@ export function UndatedTaskListScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
@@ -134,7 +133,7 @@ export function UndatedTaskListScreen({
           </View>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

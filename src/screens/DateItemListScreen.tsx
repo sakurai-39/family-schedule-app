@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Firestore } from 'firebase/firestore';
 import { AssigneeValue, CalendarItem } from '../types/CalendarItem';
 import { User } from '../types/User';
@@ -53,7 +52,7 @@ export function DateItemListScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
@@ -70,7 +69,7 @@ export function DateItemListScreen({
           onPress={() => onCreateEventForDate(date)}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>この日に予定を追加</Text>
+          <Text style={styles.primaryButtonText}>この日に予定・タスクを追加</Text>
         </Pressable>
 
         <View style={styles.sectionHeader}>
@@ -144,7 +143,7 @@ export function DateItemListScreen({
           </View>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
