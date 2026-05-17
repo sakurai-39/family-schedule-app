@@ -6,7 +6,7 @@ export type TaskTargetPeriodOption = {
 };
 
 export const TASK_TARGET_PERIOD_OPTIONS: TaskTargetPeriodOption[] = [
-  { value: null, label: '目安なし' },
+  { value: null, label: 'なし' },
   { value: 'week', label: '1週間' },
   { value: 'month', label: '1か月' },
   { value: 'six_months', label: '6か月' },
