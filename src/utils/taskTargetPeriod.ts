@@ -54,3 +54,13 @@ function addMonthsWithClamp(date: Date, months: number): Date {
   const clampedDay = Math.min(day, lastDayOfTargetMonth);
   return new Date(targetYear, targetMonth, clampedDay);
 }
+
+export function formatTargetDate(targetDate: Date | null, now: Date): string | null {
+  if (targetDate === null) return null;
+  const month = targetDate.getMonth() + 1;
+  const day = targetDate.getDate();
+  if (targetDate.getFullYear() === now.getFullYear()) {
+    return `${month}/${day}頃`;
+  }
+  return `${targetDate.getFullYear()}/${month}/${day}頃`;
+}

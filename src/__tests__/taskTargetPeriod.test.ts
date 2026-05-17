@@ -1,4 +1,4 @@
-import { calculateTargetDate } from '../utils/taskTargetPeriod';
+import { calculateTargetDate, formatTargetDate } from '../utils/taskTargetPeriod';
 
 describe('calculateTargetDate', () => {
   it('week: 登録日 + 7日を返す', () => {
@@ -52,5 +52,24 @@ describe('calculateTargetDate', () => {
   it('null period の場合は null を返す', () => {
     const createdAt = new Date(2026, 4, 17);
     expect(calculateTargetDate(createdAt, null)).toBeNull();
+  });
+});
+
+describe('formatTargetDate', () => {
+  it('同年内: M/D頃 を返す', () => {
+    const targetDate = new Date(2026, 4, 17); // 2026-05-17
+    const now = new Date(2026, 3, 1); // 2026-04-01
+    expect(formatTargetDate(targetDate, now)).toBe('5/17頃');
+  });
+
+  it('別年: YYYY/M/D頃 を返す', () => {
+    const targetDate = new Date(2027, 4, 17); // 2027-05-17
+    const now = new Date(2026, 11, 1); // 2026-12-01
+    expect(formatTargetDate(targetDate, now)).toBe('2027/5/17頃');
+  });
+
+  it('null 入力で null を返す', () => {
+    const now = new Date(2026, 3, 1);
+    expect(formatTargetDate(null, now)).toBeNull();
   });
 });
