@@ -1,4 +1,4 @@
-import { AssigneeValue, ScheduledItemDraft } from '../types/CalendarItem';
+import { AssigneeValue, ScheduledItemDraft, TaskTargetPeriod } from '../types/CalendarItem';
 import { sanitizeText, validateMemo, validateTitle } from './validation';
 
 export type ScheduleDraftKind = 'event' | 'task';
@@ -13,6 +13,7 @@ export type ScheduleDraftForm = {
   // For 'task' kind: when false, the task is saved without a due date.
   // Always treated as true for 'event' kind (events require a date).
   hasDueDate: boolean;
+  targetPeriod?: TaskTargetPeriod | null;
 };
 
 export type ScheduleDraftResult =
@@ -94,6 +95,7 @@ export function buildScheduledItemDraft(form: ScheduleDraftForm): ScheduleDraftR
         memo,
         assignee: form.assignee,
         dueAt: null,
+        targetPeriod: form.targetPeriod ?? null,
       },
     };
   }
@@ -124,6 +126,7 @@ export function buildScheduledItemDraft(form: ScheduleDraftForm): ScheduleDraftR
       memo,
       assignee: form.assignee,
       dueAt: scheduledAt,
+      targetPeriod: null,
     },
   };
 }

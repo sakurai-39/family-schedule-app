@@ -61,6 +61,7 @@ describe('updateScheduledItem', () => {
         memo: '持ち物確認',
         startAt,
         dueAt: null,
+        targetPeriod: null,
         updatedAt: { type: 'serverTimestamp' },
       }
     );
@@ -75,6 +76,7 @@ describe('updateScheduledItem', () => {
       memo: '',
       assignee: 'whoever',
       dueAt: null,
+      targetPeriod: 'six_months',
     });
 
     expect(mockedUpdateDoc).toHaveBeenCalledWith(expect.anything(), {
@@ -85,6 +87,7 @@ describe('updateScheduledItem', () => {
       memo: '',
       startAt: null,
       dueAt: null,
+      targetPeriod: 'six_months',
       updatedAt: { type: 'serverTimestamp' },
     });
   });
@@ -122,6 +125,7 @@ describe('createScheduledItem', () => {
         assignee: null,
         startAt: null,
         dueAt: null,
+        targetPeriod: null,
         memo: '',
         isCompleted: false,
         recurrence: null,
@@ -140,6 +144,7 @@ describe('createScheduledItem', () => {
       memo: '',
       startAt,
       dueAt: null,
+      targetPeriod: null,
       updatedAt: { type: 'serverTimestamp' },
     });
   });
@@ -158,6 +163,7 @@ describe('createScheduledItem', () => {
         memo: '今月中',
         assignee: 'both',
         dueAt,
+        targetPeriod: null,
       },
       'user-1'
     );
@@ -172,6 +178,7 @@ describe('createScheduledItem', () => {
       memo: '今月中',
       startAt: null,
       dueAt,
+      targetPeriod: null,
       updatedAt: { type: 'serverTimestamp' },
     });
   });

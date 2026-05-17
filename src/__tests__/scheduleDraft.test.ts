@@ -57,11 +57,12 @@ describe('buildScheduledItemDraft', () => {
         memo: '',
         assignee: 'user-A',
         dueAt: new Date(2026, 4, 9, 18, 0),
+        targetPeriod: null,
       },
     });
   });
 
-  it('builds an undated task draft when task with hasDueDate=false', () => {
+  it('builds an undated task draft with a rough target period', () => {
     const result = buildScheduledItemDraft({
       kind: 'task',
       title: '靴を買う',
@@ -70,6 +71,7 @@ describe('buildScheduledItemDraft', () => {
       dateText: '',
       timeText: '',
       hasDueDate: false,
+      targetPeriod: 'month',
     });
 
     expect(result).toEqual({
@@ -80,6 +82,7 @@ describe('buildScheduledItemDraft', () => {
         memo: '',
         assignee: 'whoever',
         dueAt: null,
+        targetPeriod: 'month',
       },
     });
   });

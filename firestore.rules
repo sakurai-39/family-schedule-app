@@ -86,6 +86,7 @@ service cloud.firestore {
             'assignee',
             'startAt',
             'dueAt',
+            'targetPeriod',
             'memo',
             'isCompleted',
             'recurrence',
@@ -104,6 +105,7 @@ service cloud.firestore {
             'assignee',
             'startAt',
             'dueAt',
+            'targetPeriod',
             'memo',
             'isCompleted',
             'recurrence',
@@ -135,6 +137,14 @@ service cloud.firestore {
                      || value in householdMembers());
         }
 
+        function isValidTaskTargetPeriod(value) {
+          return value == null
+                 || value == 'week'
+                 || value == 'month'
+                 || value == 'six_months'
+                 || value == 'year';
+        }
+
         function isValidInboxData(data) {
           return data.status == 'inbox'
                  && data.type == null
@@ -142,6 +152,7 @@ service cloud.firestore {
                  && data.assignee == null
                  && data.startAt == null
                  && data.dueAt == null
+                 && data.targetPeriod == null
                  && isValidMemo(data.memo)
                  && data.isCompleted == false
                  && data.recurrence == null
@@ -158,6 +169,7 @@ service cloud.firestore {
                  && isValidAssignee(data.assignee)
                  && data.startAt is timestamp
                  && data.dueAt == null
+                 && data.targetPeriod == null
                  && isValidMemo(data.memo)
                  && data.isCompleted is bool
                  && data.recurrence == null
@@ -174,6 +186,8 @@ service cloud.firestore {
                  && isValidAssignee(data.assignee)
                  && data.startAt == null
                  && (data.dueAt == null || data.dueAt is timestamp)
+                 && ((data.dueAt == null && isValidTaskTargetPeriod(data.targetPeriod))
+                     || (data.dueAt is timestamp && data.targetPeriod == null))
                  && isValidMemo(data.memo)
                  && data.isCompleted is bool
                  && data.recurrence == null

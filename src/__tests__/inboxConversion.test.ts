@@ -62,6 +62,7 @@ describe('inbox conversion draft quality checks', () => {
       dateText: '',
       timeText: '',
       hasDueDate: false,
+      targetPeriod: 'week',
     });
 
     expect(result).toEqual({
@@ -72,6 +73,7 @@ describe('inbox conversion draft quality checks', () => {
         memo: '',
         assignee: 'whoever',
         dueAt: null,
+        targetPeriod: 'week',
       },
     });
   });
@@ -117,6 +119,7 @@ describe('promoteInboxToScheduled quality checks', () => {
         memo: '持ち物を確認',
         startAt,
         dueAt: null,
+        targetPeriod: null,
         updatedAt: { type: 'serverTimestamp' },
       }
     );
@@ -132,6 +135,7 @@ describe('promoteInboxToScheduled quality checks', () => {
       memo: '',
       assignee: 'whoever',
       dueAt: null,
+      targetPeriod: null,
     });
 
     expect(mockedUpdateDoc).toHaveBeenCalledWith(expect.anything(), {
@@ -142,6 +146,7 @@ describe('promoteInboxToScheduled quality checks', () => {
       memo: '',
       startAt: null,
       dueAt: null,
+      targetPeriod: null,
       updatedAt: { type: 'serverTimestamp' },
     });
   });

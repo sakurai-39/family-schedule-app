@@ -1,6 +1,7 @@
 import { TITLE_MAX_LENGTH, MEMO_MAX_LENGTH, ScheduledItemDraft } from '../types/CalendarItem';
 import { DISPLAY_NAME_MAX_LENGTH } from '../types/User';
 import { INVITE_CODE_LENGTH } from '../types/Household';
+import { isValidTaskTargetPeriod } from './taskTargetPeriod';
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 
@@ -58,6 +59,8 @@ export function isValidScheduledItem(draft: ScheduledItemDraft): boolean {
   }
   if (draft.type === 'task') {
     if (draft.dueAt !== null && !(draft.dueAt instanceof Date)) return false;
+    if (draft.dueAt !== null && draft.targetPeriod !== null) return false;
+    if (!isValidTaskTargetPeriod(draft.targetPeriod)) return false;
   }
   return true;
 }

@@ -5,7 +5,11 @@ import {
   shouldNotifyAssignee,
 } from '../utils/notificationSchedule';
 import { syncLocalNotifications } from '../services/notifications';
-import { NOTIFICATION_CHANNEL_ID } from '../constants/notifications';
+import {
+  NOTIFICATION_CHANNEL_ID,
+  NOTIFICATION_PREFERENCES_STORAGE_KEY,
+  NOTIFICATION_STORAGE_KEY_PREFIX,
+} from '../constants/notifications';
 import { CalendarItem } from '../types/CalendarItem';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -26,6 +30,7 @@ jest.mock('expo-notifications', () => ({
     WEEKLY: 'weekly',
   },
   cancelScheduledNotificationAsync: jest.fn(),
+  cancelAllScheduledNotificationsAsync: jest.fn(),
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   scheduleNotificationAsync: jest.fn(),
@@ -35,6 +40,7 @@ jest.mock('expo-notifications', () => ({
 
 const SELF_ID = 'user-self';
 const PARTNER_ID = 'user-partner';
+const NOTIFICATION_IDS_STORAGE_KEY = `${NOTIFICATION_STORAGE_KEY_PREFIX}:household-1:${SELF_ID}`;
 
 type ScheduledNotificationRequest = {
   trigger: unknown;
@@ -58,6 +64,7 @@ function item(overrides: Partial<CalendarItem>): CalendarItem {
     createdAt: new Date(2026, 4, 8, 10),
     updatedAt: new Date(2026, 4, 8, 10),
     ...overrides,
+    targetPeriod: overrides.targetPeriod ?? null,
   };
 }
 
@@ -90,6 +97,30 @@ describe('notificationSchedule', () => {
       new Date(2026, 4, 9, 21),
       new Date(2026, 4, 10, 7),
     ]);
+  });
+
+  it('uses custom reminder times and disabled reminders', () => {
+    const plans = buildItemNotificationPlans([item({})], SELF_ID, new Date(2026, 4, 8, 12), {
+      previousDayReminder: {
+        enabled: false,
+        hour: 21,
+        minute: 0,
+      },
+      sameDayReminder: {
+        enabled: true,
+        hour: 8,
+        minute: 30,
+      },
+      weeklyTodoSummary: {
+        enabled: true,
+        weekday: 1,
+        hour: 20,
+        minute: 0,
+      },
+    });
+
+    expect(plans.map((plan) => plan.triggerAt)).toEqual([new Date(2026, 4, 9, 8, 30)]);
+    expect(plans.map((plan) => plan.kind)).toEqual(['same-day']);
   });
 
   it('does not schedule reminders in the past', () => {
@@ -152,6 +183,33 @@ describe('notificationSchedule', () => {
     expect(plan).toBeNull();
   });
 
+  it('does not build weekly todo summary when the setting is off', () => {
+    const plan = buildWeeklyTodoSummaryPlan(
+      [item({ itemId: 'task-1', type: 'task', startAt: null, dueAt: null })],
+      SELF_ID,
+      {
+        previousDayReminder: {
+          enabled: true,
+          hour: 21,
+          minute: 0,
+        },
+        sameDayReminder: {
+          enabled: true,
+          hour: 7,
+          minute: 0,
+        },
+        weeklyTodoSummary: {
+          enabled: false,
+          weekday: 1,
+          hour: 20,
+          minute: 0,
+        },
+      }
+    );
+
+    expect(plan).toBeNull();
+  });
+
   it('uses Sunday 20:00 as the weekly todo summary trigger', () => {
     expect(getWeeklyTodoSummaryTrigger()).toEqual({
       weekday: 1,
@@ -159,17 +217,62 @@ describe('notificationSchedule', () => {
       minute: 0,
     });
   });
+
+  it('uses custom weekly todo summary trigger settings', () => {
+    expect(
+      getWeeklyTodoSummaryTrigger({
+        previousDayReminder: {
+          enabled: true,
+          hour: 21,
+          minute: 0,
+        },
+        sameDayReminder: {
+          enabled: true,
+          hour: 7,
+          minute: 0,
+        },
+        weeklyTodoSummary: {
+          enabled: true,
+          weekday: 6,
+          hour: 19,
+          minute: 30,
+        },
+      })
+    ).toEqual({
+      weekday: 6,
+      hour: 19,
+      minute: 30,
+    });
+  });
 });
 
 describe('syncLocalNotifications', () => {
-  it('cancels old notification IDs and stores newly scheduled IDs', async () => {
+  it('clears all stale scheduled notifications and stores newly scheduled IDs', async () => {
     const api = createNotificationApi('granted');
-    const storage = createStorage(
-      JSON.stringify({
+    const storage = createStorage({
+      [NOTIFICATION_IDS_STORAGE_KEY]: JSON.stringify({
         itemNotificationIds: ['old-item'],
         weeklySummaryNotificationId: 'old-weekly',
-      })
-    );
+      }),
+      [NOTIFICATION_PREFERENCES_STORAGE_KEY]: JSON.stringify({
+        previousDayReminder: {
+          enabled: true,
+          hour: 22,
+          minute: 0,
+        },
+        sameDayReminder: {
+          enabled: false,
+          hour: 7,
+          minute: 0,
+        },
+        weeklyTodoSummary: {
+          enabled: true,
+          weekday: 3,
+          hour: 19,
+          minute: 30,
+        },
+      }),
+    });
 
     const result = await syncLocalNotifications({
       householdId: 'household-1',
@@ -181,45 +284,46 @@ describe('syncLocalNotifications', () => {
       platformOS: 'android',
     });
 
-    expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-item');
-    expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-weekly');
+    expect(api.cancelAllScheduledNotificationsAsync).toHaveBeenCalledTimes(1);
+    expect(api.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
     expect(api.setNotificationChannelAsync).toHaveBeenCalledWith(NOTIFICATION_CHANNEL_ID, {
       name: '予定とタスク',
       importance: 5,
     });
-    expect(api.scheduleNotificationAsync).toHaveBeenCalledTimes(3);
+    expect(api.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
       permissionGranted: true,
-      itemNotificationCount: 2,
+      itemNotificationCount: 1,
       weeklySummaryScheduled: true,
     });
 
     const scheduledRequests = api.scheduleNotificationAsync.mock.calls.map(([request]) => request);
     expect(scheduledRequests[0]?.trigger).toMatchObject({
       type: 'date',
+      date: new Date(2026, 4, 8, 22),
       channelId: NOTIFICATION_CHANNEL_ID,
     });
-    expect(scheduledRequests[2]?.trigger).toMatchObject({
+    expect(scheduledRequests[1]?.trigger).toMatchObject({
       type: 'weekly',
-      weekday: 1,
-      hour: 20,
-      minute: 0,
+      weekday: 3,
+      hour: 19,
+      minute: 30,
       channelId: NOTIFICATION_CHANNEL_ID,
     });
-    expect(JSON.parse(storage.getLatestValue() ?? '')).toEqual({
-      itemNotificationIds: ['notification-1', 'notification-2'],
-      weeklySummaryNotificationId: 'notification-3',
+    expect(JSON.parse(storage.getLatestValue(NOTIFICATION_IDS_STORAGE_KEY) ?? '')).toEqual({
+      itemNotificationIds: ['notification-1'],
+      weeklySummaryNotificationId: 'notification-2',
     });
   });
 
   it('clears stored IDs without scheduling when permission is denied', async () => {
     const api = createNotificationApi('denied');
-    const storage = createStorage(
-      JSON.stringify({
+    const storage = createStorage({
+      [NOTIFICATION_IDS_STORAGE_KEY]: JSON.stringify({
         itemNotificationIds: ['old-item'],
         weeklySummaryNotificationId: null,
-      })
-    );
+      }),
+    });
 
     const result = await syncLocalNotifications({
       householdId: 'household-1',
@@ -231,17 +335,48 @@ describe('syncLocalNotifications', () => {
       platformOS: 'android',
     });
 
-    expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-item');
+    expect(api.cancelAllScheduledNotificationsAsync).toHaveBeenCalledTimes(1);
+    expect(api.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
     expect(api.scheduleNotificationAsync).not.toHaveBeenCalled();
     expect(result).toEqual({
       permissionGranted: false,
       itemNotificationCount: 0,
       weeklySummaryScheduled: false,
     });
-    expect(JSON.parse(storage.getLatestValue() ?? '')).toEqual({
+    expect(JSON.parse(storage.getLatestValue(NOTIFICATION_IDS_STORAGE_KEY) ?? '')).toEqual({
       itemNotificationIds: [],
       weeklySummaryNotificationId: null,
     });
+  });
+
+  it('falls back to stored notification IDs when bulk cancel is unavailable', async () => {
+    const apiWithBulkCancel = createNotificationApi('granted');
+    const api = {
+      getPermissionsAsync: apiWithBulkCancel.getPermissionsAsync,
+      requestPermissionsAsync: apiWithBulkCancel.requestPermissionsAsync,
+      setNotificationChannelAsync: apiWithBulkCancel.setNotificationChannelAsync,
+      scheduleNotificationAsync: apiWithBulkCancel.scheduleNotificationAsync,
+      cancelScheduledNotificationAsync: apiWithBulkCancel.cancelScheduledNotificationAsync,
+    };
+    const storage = createStorage({
+      [NOTIFICATION_IDS_STORAGE_KEY]: JSON.stringify({
+        itemNotificationIds: ['old-item'],
+        weeklySummaryNotificationId: 'old-weekly',
+      }),
+    });
+
+    await syncLocalNotifications({
+      householdId: 'household-1',
+      userId: SELF_ID,
+      items: [],
+      now: new Date(2026, 4, 8, 12),
+      api,
+      storage,
+      platformOS: 'android',
+    });
+
+    expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-item');
+    expect(api.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-weekly');
   });
 });
 
@@ -259,17 +394,23 @@ function createNotificationApi(permissionStatus: 'granted' | 'denied') {
       }
     ),
     cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+    cancelAllScheduledNotificationsAsync: jest.fn(async () => undefined),
   };
 }
 
-function createStorage(initialValue: string | null) {
-  let latestValue = initialValue;
+function createStorage(initialValues: Record<string, string | null>) {
+  const values = new Map<string, string>();
+  for (const [key, value] of Object.entries(initialValues)) {
+    if (value !== null) {
+      values.set(key, value);
+    }
+  }
 
   return {
-    getItem: jest.fn(async () => latestValue),
-    setItem: jest.fn(async (_key: string, value: string) => {
-      latestValue = value;
+    getItem: jest.fn(async (key: string) => values.get(key) ?? null),
+    setItem: jest.fn(async (key: string, value: string) => {
+      values.set(key, value);
     }),
-    getLatestValue: () => latestValue,
+    getLatestValue: (key: string) => values.get(key) ?? null,
   };
 }

@@ -53,7 +53,7 @@ export function UndatedTaskListScreen({
         <View style={styles.header}>
           <View>
             <Text style={styles.eyebrow}>日付をまだ決めていないタスク</Text>
-            <Text style={styles.title}>期限なしタスク</Text>
+            <Text style={styles.title}>いつかやるタスク</Text>
           </View>
           <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>戻る</Text>
@@ -77,9 +77,9 @@ export function UndatedTaskListScreen({
 
         {!isLoading && open.length === 0 ? (
           <View style={styles.emptyArea}>
-            <Text style={styles.emptyTitle}>未完了の期限なしタスクはありません</Text>
+            <Text style={styles.emptyTitle}>未完了のいつかやるタスクはありません</Text>
             <Text style={styles.emptyText}>
-              期限が決まっていないタスクは、ここでまとめて確認できます。
+              日付がまだ決まっていないタスクは、ここでまとめて確認できます。
             </Text>
           </View>
         ) : null}

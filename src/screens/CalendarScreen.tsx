@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -20,6 +21,7 @@ import { useNotificationSync } from '../hooks/useNotificationSync';
 import {
   buildMonthGrid,
   CalendarDay,
+  getCalendarDateTapAction,
   getDisplayDate,
   getUndatedTasks,
   toLocalDateKey,
@@ -37,12 +39,14 @@ type CalendarScreenProps = {
   onOpenDateItems: (date: Date) => void;
   onOpenInbox: () => void;
   onOpenInboxComposer: () => void;
+  onOpenSearch: () => void;
   onOpenSettings: () => void;
   onOpenUndatedTasks: () => void;
+  notificationSyncRevision?: number;
 };
 
 const weekLabels = ['日', '月', '火', '水', '木', '金', '土'];
-const MAX_ITEMS_PER_CELL = 2;
+const MAX_ITEMS_PER_CELL = 4;
 const MONTH_PAGE_RADIUS = 60;
 const MONTH_PAGE_COUNT = MONTH_PAGE_RADIUS * 2 + 1;
 
@@ -56,14 +60,6 @@ function getMonthDate(baseDate: Date, offset: number): Date {
   return new Date(baseDate.getFullYear(), baseDate.getMonth() + offset, 1);
 }
 
-function getMonthOffset(fromMonth: Date, toMonth: Date): number {
-  return (
-    (toMonth.getFullYear() - fromMonth.getFullYear()) * 12 +
-    toMonth.getMonth() -
-    fromMonth.getMonth()
-  );
-}
-
 export function CalendarScreen({
   db,
   user,
@@ -71,28 +67,34 @@ export function CalendarScreen({
   onOpenDateItems,
   onOpenInbox,
   onOpenInboxComposer,
+  onOpenSearch,
   onOpenSettings,
   onOpenUndatedTasks,
+  notificationSyncRevision = 0,
 }: CalendarScreenProps) {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const householdId = user.householdId;
   const monthListRef = useRef<FlatList<MonthPage>>(null);
   const currentPageIndexRef = useRef(MONTH_PAGE_RADIUS);
   const today = useMemo(() => new Date(), []);
   const baseMonth = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today]);
   const [currentPageIndex, setCurrentPageIndexState] = useState(MONTH_PAGE_RADIUS);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [monthPickerYear, setMonthPickerYear] = useState(today.getFullYear());
   const visibleMonth = useMemo(
     () => getMonthDate(baseMonth, currentPageIndex - MONTH_PAGE_RADIUS),
     [baseMonth, currentPageIndex]
   );
   const [selectedDate, setSelectedDate] = useState(today);
+  const [openableDateKey, setOpenableDateKey] = useState<string | null>(null);
   const { items, isLoading, errorMessage } = useCalendarItems(db, householdId);
   const notificationSync = useNotificationSync({
     householdId,
     userId: user.userId,
     items,
     enabled: !isLoading,
+    refreshKey: notificationSyncRevision,
   });
 
   const monthPages = useMemo(
@@ -102,7 +104,7 @@ export function CalendarScreen({
         return {
           key: toLocalDateKey(month),
           month,
-          visibleDays: getVisibleMonthGrid(buildMonthGrid(month, today)),
+          visibleDays: buildMonthGrid(month, today),
         };
       }),
     [baseMonth, today]
@@ -130,7 +132,13 @@ export function CalendarScreen({
     [undatedTasks]
   );
 
-  const pageWidth = Math.max(windowWidth - 32, 1);
+  const bottomNavReservedHeight = 84 + insets.bottom;
+  const pageWidth = Math.max(windowWidth, 1);
+  const calendarCellWidth = (pageWidth - 6) / 7;
+  const calendarCellHeight = Math.max(
+    92,
+    Math.min(132, Math.floor((windowHeight - bottomNavReservedHeight - insets.top - 86) / 6))
+  );
 
   const updateCurrentPageIndex = useCallback((index: number) => {
     const nextIndex = Math.max(0, Math.min(MONTH_PAGE_COUNT - 1, index));
@@ -150,6 +158,24 @@ export function CalendarScreen({
       });
     },
     [pageWidth, updateCurrentPageIndex]
+  );
+
+  const openMonthPicker = useCallback(() => {
+    setMonthPickerYear(visibleMonth.getFullYear());
+    setIsMonthPickerOpen(true);
+  }, [visibleMonth]);
+
+  const jumpToMonth = useCallback(
+    (year: number, monthIndex: number) => {
+      const targetMonth = new Date(year, monthIndex, 1);
+      const offset =
+        (targetMonth.getFullYear() - baseMonth.getFullYear()) * 12 +
+        targetMonth.getMonth() -
+        baseMonth.getMonth();
+      scrollToPageIndex(MONTH_PAGE_RADIUS + offset, false);
+      setIsMonthPickerOpen(false);
+    },
+    [baseMonth, scrollToPageIndex]
   );
 
   const syncPageIndexFromOffset = useCallback(
@@ -173,36 +199,48 @@ export function CalendarScreen({
     [syncPageIndexFromOffset]
   );
 
-  const handleOpenDateItems = useCallback(
+  const handleDayPress = useCallback(
     (date: Date) => {
+      const dateKey = toLocalDateKey(date);
+      const action = getCalendarDateTapAction(openableDateKey, dateKey);
       setSelectedDate(date);
-      const targetMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-      scrollToPageIndex(MONTH_PAGE_RADIUS + getMonthOffset(baseMonth, targetMonth), false);
-      onOpenDateItems(date);
+      setOpenableDateKey(dateKey);
+      if (action === 'open') {
+        onOpenDateItems(date);
+      }
     },
-    [baseMonth, onOpenDateItems, scrollToPageIndex]
+    [onOpenDateItems, openableDateKey]
   );
 
   const renderMonthPage = useCallback(
     ({ item: page }: { item: MonthPage }) => (
       <View style={[styles.monthPage, { width: pageWidth }]}>
         <View style={styles.monthGrid}>
-          {page.visibleDays.map((day) =>
+          {page.visibleDays.map((day, index) =>
             renderDayCell({
               day,
               isSelected: day.dateKey === toLocalDateKey(selectedDate),
               items: itemsByDateKey.get(day.dateKey) ?? [],
-              onPress: () => handleOpenDateItems(day.date),
+              onPress: () => handleDayPress(day.date),
+              cellHeight: calendarCellHeight,
+              cellWidth: calendarCellWidth,
+              columnIndex: index % 7,
               userId: user.userId,
             })
           )}
         </View>
       </View>
     ),
-    [handleOpenDateItems, itemsByDateKey, pageWidth, selectedDate, user.userId]
+    [
+      calendarCellHeight,
+      calendarCellWidth,
+      handleDayPress,
+      itemsByDateKey,
+      pageWidth,
+      selectedDate,
+      user.userId,
+    ]
   );
-
-  const bottomNavReservedHeight = 96 + insets.bottom;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -217,7 +255,13 @@ export function CalendarScreen({
           >
             <Text style={styles.monthButtonText}>‹</Text>
           </Pressable>
-          <Text style={styles.monthTitle}>{formatMonthTitle(visibleMonth)}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={openMonthPicker}
+            style={styles.monthTitleButton}
+          >
+            <Text style={styles.monthTitle}>{formatMonthTitle(visibleMonth)}</Text>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             onPress={() => scrollToPageIndex(currentPageIndex + 1, false)}
@@ -280,26 +324,67 @@ export function CalendarScreen({
         {notificationSync.errorMessage ? (
           <Text style={styles.errorText}>{notificationSync.errorMessage}</Text>
         ) : null}
-
-        {openUndatedTaskCount > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onOpenUndatedTasks}
-            style={styles.todoSummaryBanner}
-          >
-            <Text style={styles.todoSummaryBannerText}>
-              期限なしタスクが{openUndatedTaskCount}件あります
-            </Text>
-          </Pressable>
-        ) : null}
       </ScrollView>
+
+      <Modal animationType="fade" transparent visible={isMonthPickerOpen}>
+        <Pressable style={styles.monthPickerBackdrop} onPress={() => setIsMonthPickerOpen(false)}>
+          <Pressable style={styles.monthPickerPanel}>
+            <View style={styles.monthPickerHeader}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setMonthPickerYear((year) => year - 1)}
+                style={styles.monthPickerYearButton}
+              >
+                <Text style={styles.monthPickerYearButtonText}>‹</Text>
+              </Pressable>
+              <Text style={styles.monthPickerYearText}>{monthPickerYear}年</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setMonthPickerYear((year) => year + 1)}
+                style={styles.monthPickerYearButton}
+              >
+                <Text style={styles.monthPickerYearButtonText}>›</Text>
+              </Pressable>
+            </View>
+            <View style={styles.monthPickerGrid}>
+              {Array.from({ length: 12 }, (_, monthIndex) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={monthIndex}
+                  onPress={() => jumpToMonth(monthPickerYear, monthIndex)}
+                  style={[
+                    styles.monthPickerMonthButton,
+                    visibleMonth.getFullYear() === monthPickerYear &&
+                      visibleMonth.getMonth() === monthIndex &&
+                      styles.monthPickerMonthButtonSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.monthPickerMonthText,
+                      visibleMonth.getFullYear() === monthPickerYear &&
+                        visibleMonth.getMonth() === monthIndex &&
+                        styles.monthPickerMonthTextSelected,
+                    ]}
+                  >
+                    {monthIndex + 1}月
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <BottomNavBar
         bottomInset={insets.bottom}
         onAddEvent={() => onCreateEventForDate(selectedDate)}
         onAddInbox={onOpenInboxComposer}
         onOpenInbox={onOpenInbox}
+        onOpenSearch={onOpenSearch}
         onOpenSettings={onOpenSettings}
+        onOpenUndatedTasks={onOpenUndatedTasks}
+        undatedTaskCount={openUndatedTaskCount}
       />
     </SafeAreaView>
   );
@@ -309,32 +394,28 @@ function formatMonthTitle(date: Date): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
 }
 
-function getVisibleMonthGrid(monthGrid: ReturnType<typeof buildMonthGrid>) {
-  let lastCurrentMonthIndex = 0;
-  for (let i = 0; i < monthGrid.length; i++) {
-    const cell = monthGrid[i];
-    if (cell?.isCurrentMonth) lastCurrentMonthIndex = i;
-  }
-  const weeksNeeded = Math.max(5, Math.ceil((lastCurrentMonthIndex + 1) / 7));
-  return monthGrid.slice(0, weeksNeeded * 7);
-}
-
 function renderDayCell({
   day,
   isSelected,
   items,
   onPress,
+  cellHeight,
+  cellWidth,
+  columnIndex,
   userId,
 }: {
   day: ReturnType<typeof buildMonthGrid>[number];
   isSelected: boolean;
   items: CalendarItem[];
   onPress: () => void;
+  cellHeight: number;
+  cellWidth: number;
+  columnIndex: number;
   userId: string;
 }) {
   const dateTone = getCalendarDateTone(day.date);
+  const hasOverflow = items.length > MAX_ITEMS_PER_CELL;
   const visibleItems = items.slice(0, MAX_ITEMS_PER_CELL);
-  const overflowCount = items.length - visibleItems.length;
 
   return (
     <Pressable
@@ -347,6 +428,8 @@ function renderDayCell({
         !day.isCurrentMonth && styles.otherMonthCell,
         day.isToday && styles.todayCell,
         isSelected && styles.selectedDayCell,
+        columnIndex > 0 && styles.dayCellColumnDivider,
+        { minHeight: cellHeight, width: cellWidth },
       ]}
     >
       <Text
@@ -365,28 +448,20 @@ function renderDayCell({
           return (
             <View
               key={item.itemId}
-              style={[
-                styles.cellItemPill,
-                cellToneStyles[presentation.assigneeTone],
-                isSelected && styles.cellItemPillSelected,
-              ]}
+              style={[styles.cellItemPill, cellToneStyles[presentation.assigneeTone]]}
             >
-              <Text style={[styles.cellItemKind, isSelected && styles.cellItemKindSelected]}>
-                {presentation.kindLabel}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={[styles.cellItemTitle, isSelected && styles.cellItemTitleSelected]}
-              >
+              <Text numberOfLines={1} style={styles.cellItemTitle}>
                 {presentation.title}
               </Text>
             </View>
           );
         })}
-        {overflowCount > 0 ? (
-          <Text style={[styles.cellOverflowText, isSelected && styles.cellOverflowSelected]}>
-            +{overflowCount}
-          </Text>
+        {hasOverflow ? (
+          <View style={styles.cellOverflowRow}>
+            <Text style={[styles.cellOverflowText, isSelected && styles.cellOverflowSelected]}>
+              …
+            </Text>
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -399,14 +474,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    gap: 8,
+    paddingHorizontal: 0,
+    paddingTop: 8,
   },
   monthHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 12,
   },
   monthButton: {
     alignItems: 'center',
@@ -427,6 +503,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
   },
+  monthTitleButton: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   weekRow: {
     flexDirection: 'row',
   },
@@ -444,7 +525,6 @@ const styles = StyleSheet.create({
     color: '#b42318',
   },
   monthGridFrame: {
-    borderRadius: 8,
     overflow: 'hidden',
   },
   monthPage: {
@@ -453,7 +533,6 @@ const styles = StyleSheet.create({
   monthGrid: {
     backgroundColor: '#ffffff',
     borderColor: '#d8ded9',
-    borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -462,12 +541,12 @@ const styles = StyleSheet.create({
   dayCell: {
     alignItems: 'stretch',
     borderColor: '#edf0ed',
-    borderRightWidth: 1,
     borderTopWidth: 1,
-    minHeight: 76,
     paddingHorizontal: 3,
     paddingVertical: 4,
-    width: `${100 / 7}%`,
+  },
+  dayCellColumnDivider: {
+    borderLeftWidth: 1,
   },
   otherMonthCell: {
     backgroundColor: '#fafbf9',
@@ -499,39 +578,30 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 2,
-    minHeight: 16,
+    minHeight: 15,
     overflow: 'hidden',
-    paddingHorizontal: 2,
-  },
-  cellItemPillSelected: {
-    backgroundColor: '#ffffff',
-    borderColor: '#ffffff',
-  },
-  cellItemKind: {
-    color: '#202124',
-    fontSize: 8,
-    fontWeight: '900',
-    lineHeight: 12,
-  },
-  cellItemKindSelected: {
-    color: '#205f4b',
+    paddingHorizontal: 4,
   },
   cellItemTitle: {
     color: '#202124',
     flex: 1,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
     lineHeight: 12,
   },
-  cellItemTitleSelected: {
-    color: '#205f4b',
+  cellOverflowRow: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    height: 12,
+    justifyContent: 'center',
+    width: 28,
   },
   cellOverflowText: {
     color: '#205f4b',
-    fontSize: 9,
-    fontWeight: '700',
-    textAlign: 'right',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    lineHeight: 12,
   },
   cellOverflowSelected: {
     color: '#ffffff',
@@ -546,42 +616,98 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  todoSummaryBanner: {
-    backgroundColor: '#eaf4ee',
-    borderColor: '#b7d2c4',
+  monthPickerBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  monthPickerPanel: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    gap: 18,
+    padding: 18,
+    width: '100%',
+  },
+  monthPickerHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  monthPickerYearButton: {
+    alignItems: 'center',
+    backgroundColor: '#f2f5f3',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    width: 48,
+  },
+  monthPickerYearButtonText: {
+    color: '#205f4b',
+    fontSize: 26,
+    fontWeight: '900',
+    lineHeight: 28,
+  },
+  monthPickerYearText: {
+    color: '#202124',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  monthPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  monthPickerMonthButton: {
+    alignItems: 'center',
+    backgroundColor: '#f7f7f2',
+    borderColor: '#d8ded9',
     borderRadius: 8,
     borderWidth: 1,
-    justifyContent: 'center',
     minHeight: 44,
-    paddingHorizontal: 14,
+    justifyContent: 'center',
+    width: '31%',
   },
-  todoSummaryBannerText: {
+  monthPickerMonthButtonSelected: {
+    backgroundColor: '#205f4b',
+    borderColor: '#205f4b',
+  },
+  monthPickerMonthText: {
+    color: '#202124',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  monthPickerMonthTextSelected: {
+    color: '#ffffff',
+  },
+  undatedTaskRowText: {
     color: '#205f4b',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
 });
 
 const cellToneStyles = StyleSheet.create<Record<CalendarCellAssigneeTone, object>>({
   self: {
-    backgroundColor: '#e4f3ec',
-    borderColor: '#8fc7aa',
+    backgroundColor: '#e8f2ff',
+    borderColor: '#005ab5',
   },
   partner: {
-    backgroundColor: '#fde8ef',
-    borderColor: '#eba6bd',
+    backgroundColor: '#fff0e0',
+    borderColor: '#d55e00',
   },
   both: {
-    backgroundColor: '#efe8ff',
-    borderColor: '#b8a2e6',
+    backgroundColor: '#eef0f3',
+    borderColor: '#2f3a45',
   },
   whoever: {
-    backgroundColor: '#fff3cf',
-    borderColor: '#e2bd55',
+    backgroundColor: '#e4f4ef',
+    borderColor: '#00876c',
   },
   unknown: {
-    backgroundColor: '#edf0ef',
-    borderColor: '#c4cbc7',
+    backgroundColor: '#ffffff',
+    borderColor: '#94a3b8',
   },
 });
 

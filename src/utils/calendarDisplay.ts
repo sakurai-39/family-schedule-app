@@ -48,6 +48,15 @@ export function getItemsForDate(items: CalendarItem[], date: Date): CalendarItem
   });
 }
 
+export type CalendarDateTapAction = 'select' | 'open';
+
+export function getCalendarDateTapAction(
+  selectedDateKey: string | null,
+  tappedDateKey: string
+): CalendarDateTapAction {
+  return selectedDateKey === tappedDateKey ? 'open' : 'select';
+}
+
 export function getUndatedTasks(items: CalendarItem[]): CalendarItem[] {
   return sortScheduledItems(items).filter(
     (item) => item.status === 'scheduled' && item.type === 'task' && item.dueAt === null

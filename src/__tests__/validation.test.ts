@@ -106,6 +106,7 @@ describe('isValidScheduledItem', () => {
         title: 'pay bill',
         assignee: 'both',
         dueAt: new Date(),
+        targetPeriod: null,
       })
     ).toBe(true);
   });
@@ -116,8 +117,20 @@ describe('isValidScheduledItem', () => {
         title: 'buy milk',
         assignee: 'whoever',
         dueAt: null,
+        targetPeriod: 'week',
       })
     ).toBe(true);
+  });
+  it('rejects a dated task with a rough target period', () => {
+    expect(
+      isValidScheduledItem({
+        type: 'task',
+        title: 'pay bill',
+        assignee: 'both',
+        dueAt: new Date(),
+        targetPeriod: 'month',
+      })
+    ).toBe(false);
   });
   it('rejects event with missing startAt', () => {
     expect(

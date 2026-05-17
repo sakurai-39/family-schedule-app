@@ -3,7 +3,6 @@ import { AssigneeValue, CalendarItem } from '../types/CalendarItem';
 export type CalendarCellAssigneeTone = 'self' | 'partner' | 'both' | 'whoever' | 'unknown';
 
 export type CalendarCellPresentation = {
-  kindLabel: '予' | 'タ';
   assigneeTone: CalendarCellAssigneeTone;
   title: string;
 };
@@ -14,7 +13,6 @@ export function buildCalendarCellPresentation(
   maxTitleLength = 10
 ): CalendarCellPresentation {
   return {
-    kindLabel: item.type === 'event' ? '予' : 'タ',
     assigneeTone: getAssigneeTone(item.assignee, currentUserId),
     title: shortenTitle(item.title, maxTitleLength),
   };
@@ -34,5 +32,5 @@ function shortenTitle(title: string, maxLength: number): string {
   const normalized = title.trim().replace(/\s+/g, ' ');
   if (normalized.length <= maxLength) return normalized;
   if (maxLength <= 1) return normalized.slice(0, maxLength);
-  return `${normalized.slice(0, maxLength - 1)}…`;
+  return `${normalized.slice(0, maxLength - 1)}...`;
 }

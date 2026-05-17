@@ -15,6 +15,7 @@ function item(overrides: Partial<CalendarItem>): CalendarItem {
     assignee: overrides.assignee ?? 'both',
     startAt: overrides.startAt ?? null,
     dueAt: overrides.dueAt ?? null,
+    targetPeriod: overrides.targetPeriod ?? null,
     memo: overrides.memo ?? '',
     isCompleted: overrides.isCompleted ?? false,
     recurrence: overrides.recurrence ?? null,
@@ -35,6 +36,7 @@ describe('navigation', () => {
     expect(getAndroidBackTarget({ name: 'invite' })).toEqual({ name: 'settings' });
     expect(getAndroidBackTarget({ name: 'inbox', mode: 'list' })).toEqual({ name: 'calendar' });
     expect(getAndroidBackTarget({ name: 'undated-tasks' })).toEqual({ name: 'calendar' });
+    expect(getAndroidBackTarget({ name: 'search' })).toEqual({ name: 'calendar' });
     expect(getAndroidBackTarget({ name: 'date-items', date: new Date(2026, 4, 7) })).toEqual({
       name: 'calendar',
     });

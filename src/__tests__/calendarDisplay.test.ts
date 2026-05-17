@@ -1,5 +1,6 @@
 import {
   buildMonthGrid,
+  getCalendarDateTapAction,
   getDisplayDate,
   getItemsForDate,
   getUndatedTasks,
@@ -18,6 +19,7 @@ function item(overrides: Partial<CalendarItem>): CalendarItem {
     assignee: overrides.assignee ?? 'both',
     startAt: overrides.startAt ?? null,
     dueAt: overrides.dueAt ?? null,
+    targetPeriod: overrides.targetPeriod ?? null,
     memo: overrides.memo ?? '',
     isCompleted: overrides.isCompleted ?? false,
     recurrence: overrides.recurrence ?? null,
@@ -59,6 +61,13 @@ describe('calendarDisplay', () => {
       morning,
       evening,
     ]);
+  });
+
+  it('selects a date on first tap and opens it when tapped again', () => {
+    expect(getCalendarDateTapAction(null, '2026-05-30')).toBe('select');
+    expect(getCalendarDateTapAction('2026-05-29', '2026-05-30')).toBe('select');
+    expect(getCalendarDateTapAction('2026-05-30', '2026-06-03')).toBe('select');
+    expect(getCalendarDateTapAction('2026-05-30', '2026-05-30')).toBe('open');
   });
 
   it('returns only scheduled tasks without a due date as undated tasks', () => {
