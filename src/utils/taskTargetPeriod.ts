@@ -33,10 +33,24 @@ export function formatTaskTargetPeriod(value: TaskTargetPeriod | null): string |
 
 export function calculateTargetDate(createdAt: Date, period: TaskTargetPeriod | null): Date | null {
   if (period === null) return null;
-  const result = new Date(createdAt);
   if (period === 'week') {
+    const result = new Date(createdAt);
     result.setDate(result.getDate() + 7);
     return result;
   }
+  if (period === 'month') {
+    return addMonthsWithClamp(createdAt, 1);
+  }
   return null;
+}
+
+function addMonthsWithClamp(date: Date, months: number): Date {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  const targetYear = year + Math.floor((month + months) / 12);
+  const targetMonth = (((month + months) % 12) + 12) % 12;
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const clampedDay = Math.min(day, lastDayOfTargetMonth);
+  return new Date(targetYear, targetMonth, clampedDay);
 }
