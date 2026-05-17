@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalendarItem } from '../types/CalendarItem';
 import { AssigneeBadge, AssigneeBadgeTone } from './AssigneeBadge';
+import { formatTaskTargetPeriod } from '../utils/taskTargetPeriod';
 
 type CalendarItemCardProps = {
   item: CalendarItem;
@@ -21,6 +22,7 @@ export function CalendarItemCard({
 }: CalendarItemCardProps) {
   const itemKindLabel = item.type === 'event' ? '予定' : 'タスク';
   const timeLabel = formatItemTime(item);
+  const targetPeriodLabel = getTargetPeriodLabel(item);
 
   return (
     <View
@@ -49,6 +51,7 @@ export function CalendarItemCard({
         <View style={styles.metaRow}>
           <Text style={styles.kindLabel}>{itemKindLabel}</Text>
           {timeLabel ? <Text style={styles.timeLabel}>{timeLabel}</Text> : null}
+          {targetPeriodLabel ? <Text style={styles.timeLabel}>{targetPeriodLabel}</Text> : null}
         </View>
         <Text style={[styles.title, item.isCompleted && styles.completedTitle]}>{item.title}</Text>
         {item.memo ? <Text style={styles.memo}>{item.memo}</Text> : null}
@@ -56,6 +59,12 @@ export function CalendarItemCard({
       </Pressable>
     </View>
   );
+}
+
+function getTargetPeriodLabel(item: CalendarItem): string | null {
+  if (item.type !== 'task' || item.dueAt !== null) return null;
+  const label = formatTaskTargetPeriod(item.targetPeriod);
+  return label && label !== '目安なし' ? `目安 ${label}` : null;
 }
 
 function formatItemTime(item: CalendarItem): string | null {
@@ -79,13 +88,13 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   eventCard: {
-    borderLeftColor: '#1f6b54',
+    borderLeftColor: '#cfd6d1',
   },
   taskCard: {
-    borderLeftColor: '#426b9f',
+    borderLeftColor: '#cfd6d1',
   },
   todoCard: {
-    borderLeftColor: '#b98712',
+    borderLeftColor: '#cfd6d1',
   },
   completedCard: {
     opacity: 0.62,

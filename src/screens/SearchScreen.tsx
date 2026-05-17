@@ -1,41 +1,37 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Firestore } from 'firebase/firestore';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AssigneeValue, CalendarItem } from '../types/CalendarItem';
 import { User } from '../types/User';
 import { AssigneeBadgeTone } from '../components/AssigneeBadge';
 import { CalendarItemCard } from '../components/CalendarItemCard';
 import { useCalendarItems } from '../hooks/useCalendarItems';
-import { getItemsForDate, splitCompletedItems } from '../utils/calendarDisplay';
 import { updateCalendarItem } from '../services/firestore';
+import { searchCalendarItems } from '../utils/calendarSearch';
 
-type DateItemListScreenProps = {
-  date: Date;
+type SearchScreenProps = {
   db: Firestore;
   user: User;
   onBack: () => void;
-  onCreateEventForDate: (date: Date) => void;
   onOpenItem: (item: CalendarItem) => void;
 };
 
-export function DateItemListScreen({
-  date,
-  db,
-  user,
-  onBack,
-  onCreateEventForDate,
-  onOpenItem,
-}: DateItemListScreenProps) {
-  const insets = useSafeAreaInsets();
+export function SearchScreen({ db, user, onBack, onOpenItem }: SearchScreenProps) {
   const householdId = user.householdId;
   const { items, isLoading, errorMessage } = useCalendarItems(db, householdId);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [query, setQuery] = useState('');
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const dateItems = useMemo(() => getItemsForDate(items, date), [items, date]);
-  const { open, completed } = useMemo(() => splitCompletedItems(dateItems), [dateItems]);
+  const results = useMemo(() => searchCalendarItems(items, query), [items, query]);
 
   const handleToggleCompleted = async (item: CalendarItem) => {
     if (!householdId) return;
@@ -53,43 +49,66 @@ export function DateItemListScreen({
     }
   };
 
+  const hasQuery = query.trim().length > 0;
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 104 + insets.bottom }]}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.eyebrow}>この日の予定とタスク</Text>
-            <Text style={styles.title}>{formatDateTitle(date)}</Text>
+            <Text style={styles.eyebrow}>予定・タスクを探す</Text>
+            <Text style={styles.title}>検索</Text>
           </View>
           <Pressable accessibilityRole="button" onPress={onBack} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>戻る</Text>
           </Pressable>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>未完了</Text>
-          <Text style={styles.countText}>{open.length}件</Text>
-        </View>
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={setQuery}
+          placeholder="例: 病院、ピアノ、ゴミ"
+          placeholderTextColor="#8b938e"
+          style={styles.searchInput}
+          value={query}
+        />
 
         {isLoading ? (
           <View style={styles.loadingArea}>
             <ActivityIndicator color="#205f4b" />
-            <Text style={styles.mutedText}>予定とタスクを読み込んでいます</Text>
+            <Text style={styles.mutedText}>予定・タスクを読み込んでいます</Text>
           </View>
         ) : null}
 
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
 
-        {!isLoading && open.length === 0 ? (
+        {hasQuery && !isLoading ? (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>検索結果</Text>
+            <Text style={styles.countText}>{results.length}件</Text>
+          </View>
+        ) : null}
+
+        {!hasQuery ? (
           <View style={styles.emptyArea}>
-            <Text style={styles.emptyTitle}>この日の未完了はありません</Text>
-            <Text style={styles.emptyText}>予定やタスクを追加すると、ここに表示されます。</Text>
+            <Text style={styles.emptyTitle}>キーワードを入力してください</Text>
+            <Text style={styles.emptyText}>
+              タイトルやメモに含まれる言葉で、予定・タスクを探せます。
+            </Text>
+          </View>
+        ) : null}
+
+        {hasQuery && !isLoading && results.length === 0 ? (
+          <View style={styles.emptyArea}>
+            <Text style={styles.emptyTitle}>見つかりませんでした</Text>
+            <Text style={styles.emptyText}>別の言葉で検索してみてください。</Text>
           </View>
         ) : null}
 
         <View style={styles.itemList}>
-          {open.map((item) => {
+          {results.map((item) => {
             const assignee = getAssigneePresentation(item.assignee, user);
             return (
               <CalendarItemCard
@@ -104,47 +123,7 @@ export function DateItemListScreen({
             );
           })}
         </View>
-
-        {completed.length > 0 ? (
-          <View style={styles.completedArea}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setShowCompleted((current) => !current)}
-              style={styles.completedToggle}
-            >
-              <Text style={styles.completedToggleText}>
-                完了済み {completed.length}件 {showCompleted ? '閉じる' : '表示'}
-              </Text>
-            </Pressable>
-            {showCompleted ? (
-              <View style={styles.itemList}>
-                {completed.map((item) => {
-                  const assignee = getAssigneePresentation(item.assignee, user);
-                  return (
-                    <CalendarItemCard
-                      assigneeLabel={assignee.label}
-                      assigneeTone={assignee.tone}
-                      isUpdating={updatingItemId === item.itemId}
-                      item={item}
-                      key={item.itemId}
-                      onPress={onOpenItem}
-                      onToggleCompleted={handleToggleCompleted}
-                    />
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
       </ScrollView>
-      <Pressable
-        accessibilityLabel="この日に予定・タスクを追加"
-        accessibilityRole="button"
-        onPress={() => onCreateEventForDate(date)}
-        style={[styles.floatingAddButton, { bottom: 22 + insets.bottom }]}
-      >
-        <Text style={styles.floatingAddButtonText}>+</Text>
-      </Pressable>
     </View>
   );
 }
@@ -153,27 +132,11 @@ function getAssigneePresentation(
   assignee: AssigneeValue | null,
   user: User
 ): { label: string; tone: AssigneeBadgeTone } {
-  if (!assignee) {
-    return { label: '未定', tone: 'unknown' };
-  }
-
-  if (assignee === 'both') {
-    return { label: '両方', tone: 'both' };
-  }
-
-  if (assignee === 'whoever') {
-    return { label: 'どちらか', tone: 'whoever' };
-  }
-
-  if (assignee === user.userId) {
-    return { label: user.displayName || '自分', tone: 'self' };
-  }
-
+  if (!assignee) return { label: '未定', tone: 'unknown' };
+  if (assignee === 'both') return { label: '両方', tone: 'both' };
+  if (assignee === 'whoever') return { label: 'どちらか', tone: 'whoever' };
+  if (assignee === user.userId) return { label: user.displayName || '自分', tone: 'self' };
   return { label: '相手', tone: 'partner' };
-}
-
-function formatDateTitle(date: Date): string {
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
 const styles = StyleSheet.create({
@@ -183,6 +146,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 18,
+    paddingBottom: 32,
     paddingHorizontal: 20,
     paddingTop: 16,
   },
@@ -217,6 +181,16 @@ const styles = StyleSheet.create({
     color: '#205f4b',
     fontSize: 13,
     fontWeight: '800',
+  },
+  searchInput: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cfd6d1',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#202124',
+    fontSize: 16,
+    minHeight: 48,
+    paddingHorizontal: 14,
   },
   sectionHeader: {
     alignItems: 'center',
@@ -259,7 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
-    padding: 18,
+    padding: 16,
   },
   emptyTitle: {
     color: '#202124',
@@ -272,42 +246,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   itemList: {
-    gap: 10,
-  },
-  completedArea: {
-    gap: 10,
-  },
-  completedToggle: {
-    backgroundColor: '#edf0ed',
-    borderRadius: 8,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: 14,
-  },
-  completedToggleText: {
-    color: '#4d5751',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  floatingAddButton: {
-    alignItems: 'center',
-    backgroundColor: '#205f4b',
-    borderRadius: 30,
-    elevation: 6,
-    height: 60,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    width: 60,
-  },
-  floatingAddButtonText: {
-    color: '#ffffff',
-    fontSize: 34,
-    fontWeight: '800',
-    lineHeight: 38,
+    gap: 12,
   },
 });

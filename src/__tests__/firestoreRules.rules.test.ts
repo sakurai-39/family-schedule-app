@@ -56,6 +56,7 @@ function validInboxPayload(createdBy: string, overrides: Record<string, unknown>
     assignee: null,
     startAt: null,
     dueAt: null,
+    targetPeriod: null,
     memo: '',
     isCompleted: false,
     recurrence: null,
@@ -75,6 +76,7 @@ function validScheduledEventPayload(createdBy: string, overrides: Record<string,
     assignee: 'both',
     startAt: new Date('2026-06-01T10:00:00.000Z'),
     dueAt: null,
+    targetPeriod: null,
     memo: '',
     isCompleted: false,
     recurrence: null,
@@ -293,6 +295,47 @@ describe('calendar_items subcollection', () => {
         assignee: 'both',
         startAt: new Date('2026-06-01T10:00:00.000Z'),
         dueAt: null,
+        targetPeriod: null,
+        memo: '',
+        updatedAt: serverTimestamp(),
+      })
+    );
+  });
+
+  it('allows converting an inbox item to an undated task with a rough target period', async () => {
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore();
+    const itemRef = doc(aliceDb, 'households/h-1/calendar_items/item-undated-task');
+    await assertSucceeds(setDoc(itemRef, validInboxPayload('user-A')));
+
+    await assertSucceeds(
+      updateDoc(itemRef, {
+        status: 'scheduled',
+        type: 'task',
+        title: '買い物',
+        assignee: 'whoever',
+        startAt: null,
+        dueAt: null,
+        targetPeriod: 'month',
+        memo: '',
+        updatedAt: serverTimestamp(),
+      })
+    );
+  });
+
+  it('rejects a dated task that also has a rough target period', async () => {
+    const aliceDb = testEnv.authenticatedContext('user-A').firestore();
+    const itemRef = doc(aliceDb, 'households/h-1/calendar_items/item-dated-task-target-period');
+    await assertSucceeds(setDoc(itemRef, validInboxPayload('user-A')));
+
+    await assertFails(
+      updateDoc(itemRef, {
+        status: 'scheduled',
+        type: 'task',
+        title: '支払い',
+        assignee: 'user-A',
+        startAt: null,
+        dueAt: new Date('2026-06-01T10:00:00.000Z'),
+        targetPeriod: 'week',
         memo: '',
         updatedAt: serverTimestamp(),
       })
@@ -312,6 +355,7 @@ describe('calendar_items subcollection', () => {
         assignee: 'both',
         startAt: null,
         dueAt: null,
+        targetPeriod: null,
         memo: '',
         updatedAt: serverTimestamp(),
       })

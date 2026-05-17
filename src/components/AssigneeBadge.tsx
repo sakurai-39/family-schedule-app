@@ -31,41 +31,41 @@ const styles = StyleSheet.create({
 
 const toneStyles = StyleSheet.create({
   self: {
-    backgroundColor: '#e4f3ec',
-    borderColor: '#8fc7aa',
+    backgroundColor: '#e8f2ff',
+    borderColor: '#005ab5',
   },
   partner: {
-    backgroundColor: '#fde8ef',
-    borderColor: '#eba6bd',
+    backgroundColor: '#fff0e0',
+    borderColor: '#d55e00',
   },
   both: {
-    backgroundColor: '#efe8ff',
-    borderColor: '#b8a2e6',
+    backgroundColor: '#eef0f3',
+    borderColor: '#2f3a45',
   },
   whoever: {
-    backgroundColor: '#fff3cf',
-    borderColor: '#e2bd55',
+    backgroundColor: '#e4f4ef',
+    borderColor: '#00876c',
   },
   unknown: {
-    backgroundColor: '#edf0ef',
-    borderColor: '#c4cbc7',
+    backgroundColor: '#ffffff',
+    borderColor: '#94a3b8',
   },
 });
 
 const labelStyles = StyleSheet.create({
   self: {
-    color: '#205f4b',
+    color: '#004c99',
   },
   partner: {
-    color: '#9a3154',
+    color: '#9f4300',
   },
   both: {
-    color: '#60409f',
+    color: '#1f2933',
   },
   whoever: {
-    color: '#765a09',
+    color: '#005f4c',
   },
   unknown: {
-    color: '#555f59',
+    color: '#475569',
   },
 });

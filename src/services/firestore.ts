@@ -32,6 +32,7 @@ import {
   sanitizeText,
   isValidScheduledItem,
 } from '../utils/validation';
+import { toTaskTargetPeriod } from '../utils/taskTargetPeriod';
 
 type CalendarItemData = Record<string, unknown>;
 
@@ -56,6 +57,7 @@ function calendarItemFromData(itemId: string, data: CalendarItemData): CalendarI
     assignee: (data.assignee as CalendarItem['assignee']) ?? null,
     startAt: toNullableDate(data.startAt),
     dueAt: toNullableDate(data.dueAt),
+    targetPeriod: toTaskTargetPeriod(data.targetPeriod),
     memo: String(data.memo ?? ''),
     isCompleted: Boolean(data.isCompleted ?? false),
     recurrence: null,
@@ -96,9 +98,11 @@ function buildScheduledItemUpdatePayload(draft: ScheduledItemDraft): Record<stri
   if (draft.type === 'event') {
     updates.startAt = draft.startAt;
     updates.dueAt = null;
+    updates.targetPeriod = null;
   } else {
     updates.startAt = null;
     updates.dueAt = draft.dueAt;
+    updates.targetPeriod = draft.dueAt === null ? draft.targetPeriod : null;
   }
 
   return updates;
@@ -304,6 +308,7 @@ export async function createInboxItem(
     assignee: null,
     startAt: null,
     dueAt: null,
+    targetPeriod: null,
     memo: '',
     isCompleted: false,
     recurrence: null,
@@ -367,7 +372,10 @@ export async function updateCalendarItem(
   householdId: string,
   itemId: string,
   updates: Partial<
-    Pick<CalendarItem, 'title' | 'memo' | 'isCompleted' | 'assignee' | 'startAt' | 'dueAt'>
+    Pick<
+      CalendarItem,
+      'title' | 'memo' | 'isCompleted' | 'assignee' | 'startAt' | 'dueAt' | 'targetPeriod'
+    >
   >
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
@@ -399,6 +407,10 @@ export async function updateCalendarItem(
 
   if (updates.dueAt !== undefined) {
     payload.dueAt = updates.dueAt;
+  }
+
+  if (updates.targetPeriod !== undefined) {
+    payload.targetPeriod = updates.targetPeriod;
   }
 
   payload.updatedAt = serverTimestamp();

@@ -7,6 +7,7 @@ import {
   NOTIFICATION_STORAGE_KEY_PREFIX,
 } from '../constants/notifications';
 import { CalendarItem } from '../types/CalendarItem';
+import { readNotificationPreferences } from './notificationPreferences';
 import {
   buildItemNotificationPlans,
   buildWeeklyTodoSummaryPlan,
@@ -23,6 +24,7 @@ type NotificationApi = {
   setNotificationChannelAsync?: typeof Notifications.setNotificationChannelAsync;
   scheduleNotificationAsync: typeof Notifications.scheduleNotificationAsync;
   cancelScheduledNotificationAsync: typeof Notifications.cancelScheduledNotificationAsync;
+  cancelAllScheduledNotificationsAsync?: typeof Notifications.cancelAllScheduledNotificationsAsync;
 };
 
 type NotificationStorage = {
@@ -56,6 +58,8 @@ const EMPTY_STORED_IDS: StoredNotificationIds = {
   weeklySummaryNotificationId: null,
 };
 
+let syncQueue: Promise<unknown> = Promise.resolve();
+
 export function configureForegroundNotificationHandling(): void {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -76,9 +80,36 @@ export async function syncLocalNotifications({
   storage = AsyncStorage,
   platformOS = Platform.OS,
 }: SyncLocalNotificationsParams): Promise<SyncLocalNotificationsResult> {
+  const syncTask = syncQueue
+    .catch(() => undefined)
+    .then(() =>
+      syncLocalNotificationsNow({
+        householdId,
+        userId,
+        items,
+        now,
+        api,
+        storage,
+        platformOS,
+      })
+    );
+
+  syncQueue = syncTask.catch(() => undefined);
+  return syncTask;
+}
+
+async function syncLocalNotificationsNow({
+  householdId,
+  userId,
+  items,
+  now,
+  api,
+  storage,
+  platformOS,
+}: Required<SyncLocalNotificationsParams>): Promise<SyncLocalNotificationsResult> {
   const storageKey = getNotificationStorageKey(householdId, userId);
   const storedIds = await readStoredNotificationIds(storage, storageKey);
-  await cancelStoredNotifications(api, storedIds);
+  await cancelStaleNotifications(api, storedIds);
 
   const permissionGranted = await ensureNotificationPermission(api);
   if (!permissionGranted) {
@@ -92,7 +123,9 @@ export async function syncLocalNotifications({
 
   await configureAndroidChannel(api, platformOS);
 
-  const itemPlans = buildItemNotificationPlans(items, userId, now);
+  const preferences = await readNotificationPreferences(storage);
+
+  const itemPlans = buildItemNotificationPlans(items, userId, now, preferences);
   const itemNotificationIds = await Promise.all(
     itemPlans.map((plan) =>
       api.scheduleNotificationAsync({
@@ -115,7 +148,7 @@ export async function syncLocalNotifications({
     )
   );
 
-  const weeklySummary = buildWeeklyTodoSummaryPlan(items, userId);
+  const weeklySummary = buildWeeklyTodoSummaryPlan(items, userId, preferences);
   const weeklySummaryNotificationId = weeklySummary
     ? await api.scheduleNotificationAsync({
         content: {
@@ -128,7 +161,7 @@ export async function syncLocalNotifications({
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-          ...getWeeklyTodoSummaryTrigger(),
+          ...getWeeklyTodoSummaryTrigger(preferences),
           channelId: NOTIFICATION_CHANNEL_ID,
         },
       })
@@ -144,6 +177,18 @@ export async function syncLocalNotifications({
     itemNotificationCount: itemNotificationIds.length,
     weeklySummaryScheduled: weeklySummaryNotificationId !== null,
   };
+}
+
+async function cancelStaleNotifications(
+  api: NotificationApi,
+  storedIds: StoredNotificationIds
+): Promise<void> {
+  if (api.cancelAllScheduledNotificationsAsync) {
+    await api.cancelAllScheduledNotificationsAsync();
+    return;
+  }
+
+  await cancelStoredNotifications(api, storedIds);
 }
 
 async function ensureNotificationPermission(api: NotificationApi): Promise<boolean> {

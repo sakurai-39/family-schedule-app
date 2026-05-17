@@ -21,6 +21,7 @@ import { CalendarItemEditScreen } from './src/screens/CalendarItemEditScreen';
 import { DateItemListScreen } from './src/screens/DateItemListScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { UndatedTaskListScreen } from './src/screens/UndatedTaskListScreen';
+import { SearchScreen } from './src/screens/SearchScreen';
 import { configureForegroundNotificationHandling } from './src/services/notifications';
 import { User } from './src/types/User';
 import { ActiveScreen, getAndroidBackTarget, getEditReturnScreen } from './src/utils/navigation';
@@ -114,6 +115,7 @@ type AuthenticatedAppProps = {
 function AuthenticatedApp({ refreshUser, signOut, user }: AuthenticatedAppProps) {
   const insets = useSafeAreaInsets();
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>({ name: 'calendar' });
+  const [notificationSyncRevision, setNotificationSyncRevision] = useState(0);
 
   useEffect(() => {
     setActiveScreen({ name: 'calendar' });
@@ -139,12 +141,14 @@ function AuthenticatedApp({ refreshUser, signOut, user }: AuthenticatedAppProps)
         onOpenDateItems={(date) => setActiveScreen({ name: 'date-items', date })}
         onOpenInbox={() => setActiveScreen({ name: 'inbox', mode: 'list' })}
         onOpenInboxComposer={() => setActiveScreen({ name: 'inbox', mode: 'compose' })}
+        onOpenSearch={() => setActiveScreen({ name: 'search' })}
         onOpenUndatedTasks={() => setActiveScreen({ name: 'undated-tasks' })}
         onOpenSettings={() => setActiveScreen({ name: 'settings' })}
+        notificationSyncRevision={notificationSyncRevision}
         user={user}
       />
     ),
-    [user]
+    [notificationSyncRevision, user]
   );
 
   const overlayScreen = useMemo(() => {
@@ -174,6 +178,23 @@ function AuthenticatedApp({ refreshUser, signOut, user }: AuthenticatedAppProps)
           db={db}
           onBack={() => setActiveScreen({ name: 'calendar' })}
           onOpenItem={(item) => setActiveScreen({ name: 'edit', item })}
+          user={user}
+        />
+      );
+    }
+
+    if (activeScreen.name === 'search') {
+      return (
+        <SearchScreen
+          db={db}
+          onBack={() => setActiveScreen({ name: 'calendar' })}
+          onOpenItem={(item) =>
+            setActiveScreen({
+              name: 'edit',
+              item,
+              returnTo: { name: 'search' },
+            })
+          }
           user={user}
         />
       );
@@ -238,6 +259,9 @@ function AuthenticatedApp({ refreshUser, signOut, user }: AuthenticatedAppProps)
         db={db}
         onBack={() => setActiveScreen({ name: 'calendar' })}
         onOpenInvite={() => setActiveScreen({ name: 'invite' })}
+        onNotificationPreferencesSaved={() =>
+          setNotificationSyncRevision((currentRevision) => currentRevision + 1)
+        }
         onSignOut={signOut}
         onUserUpdated={refreshUser}
         user={user}

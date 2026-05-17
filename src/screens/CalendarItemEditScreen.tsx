@@ -16,6 +16,7 @@ import {
   AssigneeValue,
   CalendarItem,
   MEMO_MAX_LENGTH,
+  TaskTargetPeriod,
   TITLE_MAX_LENGTH,
 } from '../types/CalendarItem';
 import { AssigneeSelector } from '../components/AssigneeSelector';
@@ -34,6 +35,7 @@ import {
   ScheduleDraftResult,
 } from '../utils/scheduleDraft';
 import { formatDateInput, formatTimeInput } from '../utils/dateTimeFormat';
+import { TASK_TARGET_PERIOD_OPTIONS } from '../utils/taskTargetPeriod';
 
 type CalendarItemEditScreenProps = {
   db: Firestore;
@@ -68,9 +70,11 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
   const initialMemo = mode === 'edit' ? props.item.memo : '';
   const initialAssignee: AssigneeValue | null =
     mode === 'edit' ? (props.item.assignee ?? user.userId) : user.userId;
+  const initialTargetPeriod = mode === 'edit' ? getInitialTargetPeriod(props.item) : null;
 
   const [kind, setKind] = useState<ScheduleDraftKind>(initialKind);
   const [hasDueDate, setHasDueDate] = useState(initialHasDueDate);
+  const [targetPeriod, setTargetPeriod] = useState<TaskTargetPeriod | null>(initialTargetPeriod);
   const [title, setTitle] = useState(initialTitle);
   const [memo, setMemo] = useState(initialMemo);
   const [assignee, setAssignee] = useState<AssigneeValue | null>(initialAssignee);
@@ -120,6 +124,7 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
       dateText,
       timeText,
       hasDueDate: kind === 'event' ? true : hasDueDate,
+      targetPeriod: kind === 'task' && !hasDueDate ? targetPeriod : null,
     });
 
     if (!result.ok) {
@@ -237,9 +242,13 @@ export function CalendarItemEditScreen(props: CalendarItemEditScreenProps) {
                   timeText={timeText}
                 />
               ) : (
-                <Text style={styles.helperText}>
-                  期限を設定せず保存します。あとから期限を追加することもできます。
-                </Text>
+                <View style={styles.targetPeriodArea}>
+                  <Text style={styles.helperText}>
+                    期限を設定せず保存します。あとから期限を追加することもできます。
+                  </Text>
+                  <Text style={styles.subLabel}>おおまかな目安</Text>
+                  <TaskTargetPeriodSelector value={targetPeriod} onChange={setTargetPeriod} />
+                </View>
               )}
             </View>
 
@@ -326,6 +335,44 @@ function getInitialHasDueDate(item: CalendarItem): boolean {
   return item.dueAt !== null;
 }
 
+function getInitialTargetPeriod(item: CalendarItem): TaskTargetPeriod | null {
+  if (item.type !== 'task' || item.dueAt !== null) return null;
+  return item.targetPeriod;
+}
+
+function TaskTargetPeriodSelector({
+  value,
+  onChange,
+}: {
+  value: TaskTargetPeriod | null;
+  onChange: (value: TaskTargetPeriod | null) => void;
+}) {
+  return (
+    <View style={styles.targetPeriodOptions}>
+      {TASK_TARGET_PERIOD_OPTIONS.map((option) => {
+        const isSelected = option.value === value;
+        return (
+          <Pressable
+            accessibilityRole="button"
+            key={option.value ?? 'none'}
+            onPress={() => onChange(option.value)}
+            style={[styles.targetPeriodOption, isSelected && styles.targetPeriodOptionSelected]}
+          >
+            <Text
+              style={[
+                styles.targetPeriodOptionText,
+                isSelected && styles.targetPeriodOptionTextSelected,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#f7f7f2',
@@ -406,6 +453,40 @@ const styles = StyleSheet.create({
     color: '#68706b',
     fontSize: 13,
     lineHeight: 18,
+  },
+  subLabel: {
+    color: '#4d5751',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  targetPeriodArea: {
+    gap: 10,
+  },
+  targetPeriodOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  targetPeriodOption: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cfd6d1',
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  targetPeriodOptionSelected: {
+    backgroundColor: '#e5f1ec',
+    borderColor: '#205f4b',
+  },
+  targetPeriodOptionText: {
+    color: '#4d5751',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  targetPeriodOptionTextSelected: {
+    color: '#205f4b',
   },
   toggleRow: {
     alignItems: 'center',

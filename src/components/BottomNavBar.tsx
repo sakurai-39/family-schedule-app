@@ -3,18 +3,24 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 type BottomNavBarProps = {
   onOpenInbox: () => void;
+  onOpenUndatedTasks: () => void;
+  onOpenSearch: () => void;
   onOpenSettings: () => void;
   onAddEvent: () => void;
   onAddInbox: () => void;
   bottomInset: number;
+  undatedTaskCount: number;
 };
 
 export function BottomNavBar({
   onOpenInbox,
+  onOpenUndatedTasks,
+  onOpenSearch,
   onOpenSettings,
   onAddEvent,
   onAddInbox,
   bottomInset,
+  undatedTaskCount,
 }: BottomNavBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
@@ -100,6 +106,26 @@ export function BottomNavBar({
         <Pressable accessibilityRole="button" onPress={onOpenInbox} style={styles.sideButton}>
           <Text style={styles.sideButtonIcon}>📋</Text>
           <Text style={styles.sideButtonLabel}>未整理</Text>
+          <Text style={styles.sideButtonLabel}>メモ</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenUndatedTasks}
+          style={styles.sideButton}
+        >
+          <View>
+            <Text style={[styles.sideButtonIcon, styles.undatedTaskIcon]}>◷</Text>
+            {undatedTaskCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {undatedTaskCount > 9 ? '9+' : undatedTaskCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.sideButtonLabel}>いつかやる</Text>
+          <Text style={styles.sideButtonLabel}>タスク</Text>
         </Pressable>
 
         <Pressable
@@ -111,8 +137,13 @@ export function BottomNavBar({
           <Animated.Text style={[styles.fabIcon, { transform: [{ rotate }] }]}>+</Animated.Text>
         </Pressable>
 
+        <Pressable accessibilityRole="button" onPress={onOpenSearch} style={styles.sideButton}>
+          <Text style={[styles.sideButtonIcon, styles.searchIcon]}>🔍</Text>
+          <Text style={styles.sideButtonLabel}>検索</Text>
+        </Pressable>
+
         <Pressable accessibilityRole="button" onPress={onOpenSettings} style={styles.sideButton}>
-          <Text style={styles.sideButtonIcon}>⚙</Text>
+          <Text style={[styles.sideButtonIcon, styles.settingsIcon]}>⚙️</Text>
           <Text style={styles.sideButtonLabel}>設定</Text>
         </Pressable>
       </View>
@@ -184,18 +215,46 @@ const styles = StyleSheet.create({
   sideButton: {
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
     paddingVertical: 6,
   },
   sideButtonIcon: {
     color: '#205f4b',
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 23,
+    lineHeight: 27,
+  },
+  undatedTaskIcon: {
+    fontSize: 25,
+  },
+  searchIcon: {
+    fontSize: 24,
+  },
+  settingsIcon: {
+    fontSize: 25,
   },
   sideButtonLabel: {
     color: '#65706a',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
-    marginTop: 2,
+    lineHeight: 11,
+  },
+  badge: {
+    alignItems: 'center',
+    backgroundColor: '#205f4b',
+    borderColor: '#ffffff',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    minWidth: 18,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: -10,
+    top: -4,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   fab: {
     alignItems: 'center',

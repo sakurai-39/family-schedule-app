@@ -4,7 +4,8 @@ export type ReturnScreen =
   | { name: 'calendar' }
   | { name: 'inbox'; mode: 'list' | 'compose' }
   | { name: 'date-items'; date: Date }
-  | { name: 'undated-tasks' };
+  | { name: 'undated-tasks' }
+  | { name: 'search' };
 
 export type ActiveScreen =
   | ReturnScreen
@@ -21,6 +22,7 @@ export function getAndroidBackTarget(activeScreen: ActiveScreen): ActiveScreen |
       return { name: 'settings' };
     case 'inbox':
     case 'undated-tasks':
+    case 'search':
     case 'date-items':
     case 'settings':
       return { name: 'calendar' };

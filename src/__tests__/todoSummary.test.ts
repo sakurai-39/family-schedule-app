@@ -24,6 +24,7 @@ function calendarItem(overrides: Partial<CalendarItem>): CalendarItem {
     createdAt: new Date('2026-05-08T00:00:00.000Z'),
     updatedAt: new Date('2026-05-08T00:00:00.000Z'),
     ...overrides,
+    targetPeriod: overrides.targetPeriod ?? null,
   };
 }
 

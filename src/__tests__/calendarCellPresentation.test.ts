@@ -5,10 +5,11 @@ const baseItem: CalendarItem = {
   itemId: 'item-1',
   status: 'scheduled',
   type: 'event',
-  title: '保育園の面談',
+  title: '保育園面談',
   assignee: 'user-self',
   startAt: new Date('2026-05-13T09:00:00'),
   dueAt: null,
+  targetPeriod: null,
   memo: '',
   isCompleted: false,
   recurrence: null,
@@ -23,23 +24,21 @@ function item(overrides: Partial<CalendarItem>): CalendarItem {
 }
 
 describe('buildCalendarCellPresentation', () => {
-  it('uses event label and self tone for current user assignee', () => {
+  it('uses event type and self tone for current user assignee', () => {
     expect(
       buildCalendarCellPresentation(item({ type: 'event', assignee: 'user-self' }), 'user-self')
     ).toEqual({
       assigneeTone: 'self',
-      kindLabel: '予',
-      title: '保育園の面談',
+      title: '保育園面談',
     });
   });
 
-  it('uses task label and partner tone for another user assignee', () => {
+  it('uses task type and partner tone for another user assignee', () => {
     expect(
       buildCalendarCellPresentation(item({ type: 'task', assignee: 'user-partner' }), 'user-self')
     ).toEqual({
       assigneeTone: 'partner',
-      kindLabel: 'タ',
-      title: '保育園の面談',
+      title: '保育園面談',
     });
   });
 
@@ -62,6 +61,6 @@ describe('buildCalendarCellPresentation', () => {
         'user-self',
         8
       ).title
-    ).toBe('とても長い予定…');
+    ).toBe('とても長い予定...');
   });
 });

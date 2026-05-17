@@ -237,11 +237,13 @@ describe('inbox/calendar_items service', () => {
       title: '保育園に連絡',
       assignee: 'whoever',
       dueAt: null,
+      targetPeriod: 'month',
     });
     const item = await getCalendarItem(aliceDb, householdId, itemId);
     expect(item?.status).toBe('scheduled');
     expect(item?.type).toBe('task');
     expect(item?.dueAt).toBeNull();
+    expect(item?.targetPeriod).toBe('month');
   });
 
   it('updateCalendarItem updates memo and updatedAt', async () => {
@@ -256,6 +258,7 @@ describe('inbox/calendar_items service', () => {
       title: 'メモ',
       assignee: 'user-A',
       dueAt: null,
+      targetPeriod: null,
     });
     await updateCalendarItem(aliceDb, householdId, itemId, { memo: '追記内容' });
     const item = await getCalendarItem(aliceDb, householdId, itemId);
@@ -291,6 +294,7 @@ describe('inbox/calendar_items service', () => {
       title: '昇格済み',
       assignee: 'user-A',
       dueAt: null,
+      targetPeriod: null,
     });
     const inboxItems = await listCalendarItems(aliceDb, householdId, { status: 'inbox' });
     expect(inboxItems.length).toBe(1);

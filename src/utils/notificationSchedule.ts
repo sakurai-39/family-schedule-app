@@ -1,12 +1,6 @@
-import {
-  ITEM_PREVIOUS_DAY_REMINDER_HOUR,
-  ITEM_REMINDER_MINUTE,
-  ITEM_SAME_DAY_REMINDER_HOUR,
-  WEEKLY_TODO_SUMMARY_HOUR,
-  WEEKLY_TODO_SUMMARY_MINUTE,
-  WEEKLY_TODO_SUMMARY_WEEKDAY,
-} from '../constants/notifications';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { AssigneeValue, CalendarItem } from '../types/CalendarItem';
+import { NotificationPreferences } from '../types/NotificationPreferences';
 
 export type ItemReminderKind = 'previous-day' | 'same-day';
 
@@ -42,7 +36,8 @@ export function shouldNotifyAssignee(
 export function buildItemNotificationPlans(
   items: CalendarItem[],
   currentUserId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  preferences: NotificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES
 ): ItemNotificationPlan[] {
   return items.flatMap((item) => {
     const baseDate = getItemReminderBaseDate(item);
@@ -50,7 +45,7 @@ export function buildItemNotificationPlans(
       return [];
     }
 
-    return buildReminderTriggers(baseDate)
+    return buildReminderTriggers(baseDate, preferences)
       .filter((trigger) => trigger.triggerAt.getTime() > now.getTime())
       .map((trigger) => ({
         itemId: item.itemId,
@@ -64,8 +59,13 @@ export function buildItemNotificationPlans(
 
 export function buildWeeklyTodoSummaryPlan(
   items: CalendarItem[],
-  currentUserId: string
+  currentUserId: string,
+  preferences: NotificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES
 ): WeeklyTodoSummaryPlan | null {
+  if (!preferences.weeklyTodoSummary.enabled) {
+    return null;
+  }
+
   const count = items.filter(
     (item) =>
       item.status === 'scheduled' &&
@@ -86,11 +86,13 @@ export function buildWeeklyTodoSummaryPlan(
   };
 }
 
-export function getWeeklyTodoSummaryTrigger(): WeeklyTodoSummaryTrigger {
+export function getWeeklyTodoSummaryTrigger(
+  preferences: NotificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES
+): WeeklyTodoSummaryTrigger {
   return {
-    weekday: WEEKLY_TODO_SUMMARY_WEEKDAY,
-    hour: WEEKLY_TODO_SUMMARY_HOUR,
-    minute: WEEKLY_TODO_SUMMARY_MINUTE,
+    weekday: preferences.weeklyTodoSummary.weekday,
+    hour: preferences.weeklyTodoSummary.hour,
+    minute: preferences.weeklyTodoSummary.minute,
   };
 }
 
@@ -106,20 +108,41 @@ function getItemReminderBaseDate(item: CalendarItem): Date | null {
   return item.dueAt;
 }
 
-function buildReminderTriggers(baseDate: Date): {
+function buildReminderTriggers(
+  baseDate: Date,
+  preferences: NotificationPreferences
+): {
   kind: ItemReminderKind;
   triggerAt: Date;
 }[] {
-  return [
-    {
+  const triggers: {
+    kind: ItemReminderKind;
+    triggerAt: Date;
+  }[] = [];
+
+  if (preferences.previousDayReminder.enabled) {
+    triggers.push({
       kind: 'previous-day',
-      triggerAt: withLocalTime(addDays(baseDate, -1), ITEM_PREVIOUS_DAY_REMINDER_HOUR),
-    },
-    {
+      triggerAt: withLocalTime(
+        addDays(baseDate, -1),
+        preferences.previousDayReminder.hour,
+        preferences.previousDayReminder.minute
+      ),
+    });
+  }
+
+  if (preferences.sameDayReminder.enabled) {
+    triggers.push({
       kind: 'same-day',
-      triggerAt: withLocalTime(baseDate, ITEM_SAME_DAY_REMINDER_HOUR),
-    },
-  ];
+      triggerAt: withLocalTime(
+        baseDate,
+        preferences.sameDayReminder.hour,
+        preferences.sameDayReminder.minute
+      ),
+    });
+  }
+
+  return triggers;
 }
 
 function buildItemReminderBody(item: CalendarItem, kind: ItemReminderKind): string {
@@ -132,6 +155,6 @@ function addDays(date: Date, amount: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
 }
 
-function withLocalTime(date: Date, hour: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, ITEM_REMINDER_MINUTE);
+function withLocalTime(date: Date, hour: number, minute: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
 }

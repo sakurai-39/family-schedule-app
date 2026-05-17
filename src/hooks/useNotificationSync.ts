@@ -9,6 +9,7 @@ type UseNotificationSyncParams = {
   userId: string;
   items: CalendarItem[];
   enabled?: boolean;
+  refreshKey?: unknown;
 };
 
 export function useNotificationSync({
@@ -16,6 +17,7 @@ export function useNotificationSync({
   userId,
   items,
   enabled = true,
+  refreshKey,
 }: UseNotificationSyncParams): {
   status: NotificationSyncStatus;
   errorMessage: string | null;
@@ -56,7 +58,7 @@ export function useNotificationSync({
     return () => {
       isActive = false;
     };
-  }, [enabled, householdId, items, userId]);
+  }, [enabled, householdId, items, refreshKey, userId]);
 
   return { status, errorMessage };
 }

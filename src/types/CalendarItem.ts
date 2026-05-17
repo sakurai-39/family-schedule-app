@@ -1,6 +1,7 @@
 export type ItemStatus = 'inbox' | 'scheduled';
 export type ItemType = 'event' | 'task';
 export type AssigneeValue = string | 'both' | 'whoever';
+export type TaskTargetPeriod = 'week' | 'month' | 'six_months' | 'year';
 
 export interface CalendarItem {
   itemId: string;
@@ -10,6 +11,7 @@ export interface CalendarItem {
   assignee: AssigneeValue | null;
   startAt: Date | null;
   dueAt: Date | null;
+  targetPeriod: TaskTargetPeriod | null;
   memo: string;
   isCompleted: boolean;
   recurrence: null;
@@ -41,6 +43,7 @@ export type ScheduledTaskDraft = {
   title: string;
   assignee: AssigneeValue;
   dueAt: Date | null;
+  targetPeriod: TaskTargetPeriod | null;
   memo?: string;
 };
 
