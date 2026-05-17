@@ -104,7 +104,7 @@ export function BottomNavBar({
 
       <View style={[styles.bar, { paddingBottom: bottomInset }]}>
         <Pressable accessibilityRole="button" onPress={onOpenInbox} style={styles.sideButton}>
-          <Text style={styles.sideButtonIcon}>📋</Text>
+          <NavIcon name="memo" />
           <Text style={styles.sideButtonLabel}>未整理</Text>
           <Text style={styles.sideButtonLabel}>メモ</Text>
         </Pressable>
@@ -114,8 +114,8 @@ export function BottomNavBar({
           onPress={onOpenUndatedTasks}
           style={styles.sideButton}
         >
-          <View>
-            <Text style={[styles.sideButtonIcon, styles.undatedTaskIcon]}>◷</Text>
+          <View style={styles.iconWithBadge}>
+            <NavIcon name="clock" />
             {undatedTaskCount > 0 ? (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
@@ -138,14 +138,62 @@ export function BottomNavBar({
         </Pressable>
 
         <Pressable accessibilityRole="button" onPress={onOpenSearch} style={styles.sideButton}>
-          <Text style={[styles.sideButtonIcon, styles.searchIcon]}>🔍</Text>
+          <NavIcon name="search" />
           <Text style={styles.sideButtonLabel}>検索</Text>
         </Pressable>
 
         <Pressable accessibilityRole="button" onPress={onOpenSettings} style={styles.sideButton}>
-          <Text style={[styles.sideButtonIcon, styles.settingsIcon]}>⚙️</Text>
+          <NavIcon name="settings" />
           <Text style={styles.sideButtonLabel}>設定</Text>
         </Pressable>
+      </View>
+    </View>
+  );
+}
+
+type NavIconName = 'memo' | 'clock' | 'search' | 'settings';
+
+function NavIcon({ name }: { name: NavIconName }) {
+  if (name === 'memo') {
+    return (
+      <View style={styles.iconFrame}>
+        <View style={styles.memoSheet}>
+          <View style={styles.memoLineShort} />
+          <View style={styles.memoLine} />
+          <View style={styles.memoLine} />
+        </View>
+      </View>
+    );
+  }
+
+  if (name === 'clock') {
+    return (
+      <View style={styles.iconFrame}>
+        <View style={styles.clockCircle}>
+          <View style={styles.clockHandHour} />
+          <View style={styles.clockHandMinute} />
+        </View>
+      </View>
+    );
+  }
+
+  if (name === 'search') {
+    return (
+      <View style={styles.iconFrame}>
+        <View style={styles.searchCircle} />
+        <View style={styles.searchHandle} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.iconFrame}>
+      <View style={styles.gearRing}>
+        <View style={[styles.gearTooth, styles.gearToothTop]} />
+        <View style={[styles.gearTooth, styles.gearToothRight]} />
+        <View style={[styles.gearTooth, styles.gearToothBottom]} />
+        <View style={[styles.gearTooth, styles.gearToothLeft]} />
+        <View style={styles.gearCenter} />
       </View>
     </View>
   );
@@ -218,25 +266,126 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingVertical: 6,
   },
-  sideButtonIcon: {
-    color: '#205f4b',
-    fontSize: 23,
-    lineHeight: 27,
-  },
-  undatedTaskIcon: {
-    fontSize: 25,
-  },
-  searchIcon: {
-    fontSize: 24,
-  },
-  settingsIcon: {
-    fontSize: 25,
-  },
   sideButtonLabel: {
     color: '#65706a',
     fontSize: 9,
     fontWeight: '700',
     lineHeight: 11,
+  },
+  iconFrame: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    marginBottom: 2,
+    width: 28,
+  },
+  iconWithBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memoSheet: {
+    borderColor: '#205f4b',
+    borderRadius: 3,
+    borderWidth: 2,
+    gap: 3,
+    height: 22,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    width: 18,
+  },
+  memoLine: {
+    backgroundColor: '#205f4b',
+    borderRadius: 999,
+    height: 2,
+    width: 8,
+  },
+  memoLineShort: {
+    backgroundColor: '#205f4b',
+    borderRadius: 999,
+    height: 2,
+    width: 5,
+  },
+  clockCircle: {
+    borderColor: '#205f4b',
+    borderRadius: 11,
+    borderWidth: 2,
+    height: 22,
+    width: 22,
+  },
+  clockHandHour: {
+    backgroundColor: '#205f4b',
+    borderRadius: 999,
+    height: 7,
+    left: 9,
+    position: 'absolute',
+    top: 4,
+    width: 2,
+  },
+  clockHandMinute: {
+    backgroundColor: '#205f4b',
+    borderRadius: 999,
+    height: 2,
+    left: 9,
+    position: 'absolute',
+    top: 10,
+    width: 7,
+  },
+  searchCircle: {
+    borderColor: '#205f4b',
+    borderRadius: 8,
+    borderWidth: 2,
+    height: 17,
+    left: 4,
+    position: 'absolute',
+    top: 4,
+    width: 17,
+  },
+  searchHandle: {
+    backgroundColor: '#205f4b',
+    borderRadius: 999,
+    height: 10,
+    position: 'absolute',
+    right: 3,
+    top: 18,
+    transform: [{ rotate: '-45deg' }],
+    width: 2,
+  },
+  gearRing: {
+    alignItems: 'center',
+    borderColor: '#205f4b',
+    borderRadius: 10,
+    borderWidth: 2,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  gearTooth: {
+    backgroundColor: '#205f4b',
+    borderRadius: 1,
+    height: 5,
+    position: 'absolute',
+    width: 3,
+  },
+  gearToothTop: {
+    top: -5,
+  },
+  gearToothRight: {
+    right: -4,
+    transform: [{ rotate: '90deg' }],
+  },
+  gearToothBottom: {
+    bottom: -5,
+  },
+  gearToothLeft: {
+    left: -4,
+    transform: [{ rotate: '90deg' }],
+  },
+  gearCenter: {
+    borderColor: '#205f4b',
+    borderRadius: 4,
+    borderWidth: 2,
+    height: 8,
+    width: 8,
   },
   badge: {
     alignItems: 'center',
