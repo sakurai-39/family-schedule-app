@@ -1,7 +1,11 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalendarItem } from '../types/CalendarItem';
 import { AssigneeBadge, AssigneeBadgeTone } from './AssigneeBadge';
-import { formatTaskTargetPeriod } from '../utils/taskTargetPeriod';
+import {
+  calculateTargetDate,
+  formatTargetDate,
+  formatTaskTargetPeriod,
+} from '../utils/taskTargetPeriod';
 
 type CalendarItemCardProps = {
   item: CalendarItem;
@@ -22,7 +26,7 @@ export function CalendarItemCard({
 }: CalendarItemCardProps) {
   const itemKindLabel = item.type === 'event' ? '予定' : 'タスク';
   const timeLabel = formatItemTime(item);
-  const targetPeriodLabel = getTargetPeriodLabel(item);
+  const targetPeriodLabel = getTargetPeriodLabel(item, new Date());
 
   return (
     <View
@@ -61,11 +65,14 @@ export function CalendarItemCard({
   );
 }
 
-function getTargetPeriodLabel(item: CalendarItem): string | null {
+function getTargetPeriodLabel(item: CalendarItem, now: Date): string | null {
   if (item.type !== 'task' || item.dueAt !== null) return null;
   if (item.targetPeriod === null) return null;
-  const label = formatTaskTargetPeriod(item.targetPeriod);
-  return label ? `目安 ${label}` : null;
+  const periodLabel = formatTaskTargetPeriod(item.targetPeriod);
+  if (!periodLabel) return null;
+  const targetDate = calculateTargetDate(item.createdAt, item.targetPeriod);
+  const dateText = formatTargetDate(targetDate, now);
+  return dateText ? `目安 ${periodLabel} (〜${dateText})` : `目安 ${periodLabel}`;
 }
 
 function formatItemTime(item: CalendarItem): string | null {
