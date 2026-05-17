@@ -698,12 +698,12 @@ const cellToneStyles = StyleSheet.create<Record<CalendarCellAssigneeTone, object
     borderColor: '#d55e00',
   },
   both: {
-    backgroundColor: '#eef0f3',
-    borderColor: '#2f3a45',
+    backgroundColor: '#f2f3f5',
+    borderColor: '#111827',
   },
   whoever: {
-    backgroundColor: '#e4f4ef',
-    borderColor: '#00876c',
+    backgroundColor: '#e5f7f8',
+    borderColor: '#007c89',
   },
   unknown: {
     backgroundColor: '#ffffff',
