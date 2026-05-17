@@ -63,8 +63,9 @@ export function CalendarItemCard({
 
 function getTargetPeriodLabel(item: CalendarItem): string | null {
   if (item.type !== 'task' || item.dueAt !== null) return null;
+  if (item.targetPeriod === null) return null;
   const label = formatTaskTargetPeriod(item.targetPeriod);
-  return label && label !== '目安なし' ? `目安 ${label}` : null;
+  return label ? `目安 ${label}` : null;
 }
 
 function formatItemTime(item: CalendarItem): string | null {
