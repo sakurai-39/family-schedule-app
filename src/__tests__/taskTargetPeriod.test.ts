@@ -24,4 +24,33 @@ describe('calculateTargetDate', () => {
     const result = calculateTargetDate(createdAt, 'month');
     expect(result).toEqual(new Date(2024, 1, 29)); // 2024-02-29
   });
+
+  it('six_months: 6か月後の同日を返す', () => {
+    const createdAt = new Date(2026, 4, 17); // 2026-05-17
+    const result = calculateTargetDate(createdAt, 'six_months');
+    expect(result).toEqual(new Date(2026, 10, 17)); // 2026-11-17
+  });
+
+  it('six_months: 月末調整あり', () => {
+    const createdAt = new Date(2026, 7, 31); // 2026-08-31
+    const result = calculateTargetDate(createdAt, 'six_months');
+    expect(result).toEqual(new Date(2027, 1, 28)); // 2027-02-28
+  });
+
+  it('year: 翌年の同日を返す', () => {
+    const createdAt = new Date(2026, 4, 17); // 2026-05-17
+    const result = calculateTargetDate(createdAt, 'year');
+    expect(result).toEqual(new Date(2027, 4, 17)); // 2027-05-17
+  });
+
+  it('year: うるう年 2/29 → 翌年 2/28', () => {
+    const createdAt = new Date(2024, 1, 29); // 2024-02-29
+    const result = calculateTargetDate(createdAt, 'year');
+    expect(result).toEqual(new Date(2025, 1, 28)); // 2025-02-28
+  });
+
+  it('null period の場合は null を返す', () => {
+    const createdAt = new Date(2026, 4, 17);
+    expect(calculateTargetDate(createdAt, null)).toBeNull();
+  });
 });

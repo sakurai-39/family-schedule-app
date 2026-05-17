@@ -38,9 +38,9 @@ export function calculateTargetDate(createdAt: Date, period: TaskTargetPeriod | 
     result.setDate(result.getDate() + 7);
     return result;
   }
-  if (period === 'month') {
-    return addMonthsWithClamp(createdAt, 1);
-  }
+  if (period === 'month') return addMonthsWithClamp(createdAt, 1);
+  if (period === 'six_months') return addMonthsWithClamp(createdAt, 6);
+  if (period === 'year') return addMonthsWithClamp(createdAt, 12);
   return null;
 }
 
