@@ -30,3 +30,13 @@ export function toTaskTargetPeriod(value: unknown): TaskTargetPeriod | null {
 export function formatTaskTargetPeriod(value: TaskTargetPeriod | null): string | null {
   return TASK_TARGET_PERIOD_OPTIONS.find((option) => option.value === value)?.label ?? null;
 }
+
+export function calculateTargetDate(createdAt: Date, period: TaskTargetPeriod | null): Date | null {
+  if (period === null) return null;
+  const result = new Date(createdAt);
+  if (period === 'week') {
+    result.setDate(result.getDate() + 7);
+    return result;
+  }
+  return null;
+}
